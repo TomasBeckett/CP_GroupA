@@ -1,6 +1,6 @@
 # CP Group A — AML & Fraud Risk Dashboard
 
-Proyek ini menggabungkan dashboard AML, API Flask, model Random Forest, dataset transaksi sintetis, dan PostgreSQL untuk demo lokal.
+Proyek menggabungkan dashboard AML, API Flask, model Random Forest, dataset transaksi sintetis, dan PostgreSQL untuk demo lokal.
 
 ## Struktur repository
 
