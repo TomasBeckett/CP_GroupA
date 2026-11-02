@@ -30,6 +30,8 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe app.py
 ```
 
-Salin `aml_dashboard_integration_package\.env.example` ke `CP_GroupA\.env` dan isi kredensial PostgreSQL lokal. Jalankan `aml_dashboard_integration_package\database\database_schema.sql` pada database yang dipakai, lalu buka `http://127.0.0.1:5000`. Dataset default dibaca dari `CP_GroupA\data`; pastikan tabel master PostgreSQL sudah tersedia sebelum mengunggah CSV transaksi.
+1. Salin `aml_dashboard_integration_package\.env.example` ke `CP_GroupA\.env`
+2. isi kredensial PostgreSQL lokal. Jalankan `aml_dashboard_integration_package\database\database_schema.sql` pada database yang dipakai
+3. lalu buka `http://127.0.0.1:5000`. Dataset default dibaca dari `CP_GroupA\data`; pastikan tabel master PostgreSQL sudah tersedia sebelum mengunggah CSV transaksi.
 
 Petunjuk lengkap, training model, database, serta opsi deployment tersedia di [README integrasi](aml_dashboard_integration_package/README_integrasi_AML.md).
