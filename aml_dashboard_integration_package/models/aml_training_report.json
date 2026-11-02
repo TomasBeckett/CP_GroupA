@@ -1,0 +1,91 @@
+{
+  "target": "scenario_label",
+  "target_mapping": {
+    "NORMAL": 0,
+    "SUSPICIOUS": 1
+  },
+  "positive_class": "POTENTIAL_FRAUD_PROXY",
+  "positive_class_source_label": "SUSPICIOUS",
+  "positive_class_interpretation": "Proxy for potential fraud risk only; the synthetic SUSPICIOUS label is not a confirmed fraud outcome.",
+  "excluded_edge_case_rows": 16500,
+  "dropped_invalid_timestamp_rows": 0,
+  "dataset_rows": 350000,
+  "labeled_rows": 333500,
+  "feature_count": 46,
+  "train_rows": 266803,
+  "test_rows": 66697,
+  "split_method": "chronological unique-timestamp holdout",
+  "test_fraction_requested": 0.2,
+  "test_start_utc": "2026-05-18T06:04:42+00:00",
+  "train_class_counts": {
+    "NORMAL": 238718,
+    "POTENTIAL_FRAUD_PROXY": 28085
+  },
+  "test_class_counts": {
+    "NORMAL": 59782,
+    "POTENTIAL_FRAUD_PROXY": 6915
+  },
+  "threshold_metrics": {
+    "threshold": 0.5,
+    "accuracy": 0.9093062656491296,
+    "balanced_accuracy": 0.7615437306039371,
+    "precision_potential_fraud_proxy": 0.561089164785553,
+    "recall_potential_fraud_proxy": 0.5751265365148228,
+    "f1_potential_fraud_proxy": 0.5680211383275012,
+    "roc_auc": 0.8738496895432531,
+    "average_precision": 0.6069524450868387,
+    "confusion_matrix_labels": [
+      "NORMAL",
+      "POTENTIAL_FRAUD_PROXY"
+    ],
+    "confusion_matrix": [
+      [
+        56671,
+        3111
+      ],
+      [
+        2938,
+        3977
+      ]
+    ],
+    "classification_report": {
+      "NORMAL": {
+        "precision": 0.9507121407841098,
+        "recall": 0.9479609246930514,
+        "f1-score": 0.9493345394543977,
+        "support": 59782.0
+      },
+      "POTENTIAL_FRAUD_PROXY": {
+        "precision": 0.561089164785553,
+        "recall": 0.5751265365148228,
+        "f1-score": 0.5680211383275012,
+        "support": 6915.0
+      },
+      "accuracy": 0.9093062656491296,
+      "macro avg": {
+        "precision": 0.7559006527848314,
+        "recall": 0.7615437306039371,
+        "f1-score": 0.7586778388909494,
+        "support": 66697.0
+      },
+      "weighted avg": {
+        "precision": 0.9103168774434796,
+        "recall": 0.9093062656491296,
+        "f1-score": 0.9098007947763388,
+        "support": 66697.0
+      }
+    }
+  },
+  "random_forest": {
+    "n_estimators": 100,
+    "max_depth": 20,
+    "class_weight": "balanced_subsample",
+    "min_samples_leaf": 2,
+    "random_state": 42
+  },
+  "fit_seconds": 343.034,
+  "total_seconds": 393.354,
+  "model_output": "H:\\tomas\\Github\\CP_GroupA\\aml_dashboard_integration_package\\aml_random_forest_pipeline_trained.joblib",
+  "data_directory": "H:\\tomas\\Github\\CP_GroupA",
+  "data_caveat": "Labels and records are synthetic. EDGE_CASE rows were excluded; this model learns NORMAL versus SUSPICIOUS scenario_label, using SUSPICIOUS only as a proxy for potential fraud risk, not confirmed fraud."
+}
