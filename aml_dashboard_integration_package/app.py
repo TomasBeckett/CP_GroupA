@@ -1507,6 +1507,27 @@ def auth_login():
             "code": "ACCOUNT_INACTIVE",
         }), 403
 
+    # Role validation: validasi kecocokan role yang dipilih dengan role akun di database
+    selected_role = (payload.get("role") or payload.get("selected_role") or "").strip().lower()
+    user_role = user.get("role", "analyst")
+    if selected_role and selected_role != user_role:
+        role_display = {
+            "admin": "Administrator",
+            "analyst": "AML Analyst",
+            "investigator": "AML Investigator",
+            "supervisor": "AML Supervisor",
+            "auditor": "Compliance Auditor",
+        }
+        actual_name = role_display.get(user_role, user_role.upper())
+        selected_name = role_display.get(selected_role, selected_role.upper())
+        return jsonify({
+            "ok": False,
+            "error": f"Role tidak cocok: Akun '{email}' terdaftar sebagai {actual_name}, tidak diizinkan login sebagai {selected_name}. Silakan pilih role yang sesuai dengan akun Anda di database.",
+            "code": "ROLE_MISMATCH",
+            "actual_role": user_role,
+            "selected_role": selected_role,
+        }), 403
+
     # Generate token
     token = supabase_token or generate_jwt(user)
     user["last_login_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()

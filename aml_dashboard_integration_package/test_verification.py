@@ -18,17 +18,28 @@ res = client.get("/api/auth/config")
 print("Status:", res.status_code, res.get_json())
 assert res.status_code == 200
 
-print("\n=== 3. Login 5 Roles ===")
+print("\n=== 3. Login 5 Roles with Role Validation ===")
 roles = ["admin", "analyst", "investigator", "supervisor", "auditor"]
 tokens = {}
 for role in roles:
     email = f"{role}@fcip.id"
-    res = client.post("/api/auth/login", json={"email": email, "password": "Password123!"})
+    # Login dengan role yang sesuai di database -> berhasil 200
+    res = client.post("/api/auth/login", json={"email": email, "password": "Password123!", "role": role})
     data = res.get_json()
     assert res.status_code == 200, f"Login failed for {email}: {data}"
     assert data["user"]["role"] == role
     tokens[role] = data["token"]
-    print(f"✓ {role} login OK (name: {data['user']['full_name']})")
+    print(f"✓ {role} login OK dengan role matching (name: {data['user']['full_name']})")
+
+# Test role mismatch: akun analyst mencoba login sebagai admin -> harus DITOLAK 403
+mismatch_res = client.post("/api/auth/login", json={
+    "email": "analyst@fcip.id",
+    "password": "Password123!",
+    "role": "admin"
+})
+assert mismatch_res.status_code == 403, f"Expected 403 for role mismatch, got {mismatch_res.status_code}"
+assert mismatch_res.get_json().get("code") == "ROLE_MISMATCH"
+print("✓ Role mismatch validation verified: analyst dilarang login sebagai admin (403 ROLE_MISMATCH)")
 
 print("\n=== 4. GET /api/auth/me for each role ===")
 for role in roles:
