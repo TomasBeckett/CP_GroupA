@@ -1,0 +1,62 @@
+{
+  "model_name": "FCIP Fraud Detection Model",
+  "target": "target_fraud",
+  "target_typologies": [
+    "P04_SUDDEN_SPIKE",
+    "P05_DORMANT_REACTIVATION",
+    "P06_HIGH_VELOCITY",
+    "P07_SHARED_DEVICE_NETWORK"
+  ],
+  "train_rows": 266803,
+  "test_rows": 66697,
+  "train_metrics": {
+    "accuracy": 0.828420220162442,
+    "balanced_accuracy": 0.7794588628889219,
+    "roc_auc": 0.8832503515279491,
+    "average_precision": 0.4277806169630821,
+    "precision": 0.180456961092362,
+    "recall": 0.7252884315559713,
+    "f1_score": 0.28900692697170194,
+    "confusion_matrix": [
+      [
+        211721,
+        42254
+      ],
+      [
+        3524,
+        9304
+      ]
+    ],
+    "support_negative": 253975,
+    "support_positive": 12828
+  },
+  "test_metrics": {
+    "accuracy": 0.8303072102193502,
+    "balanced_accuracy": 0.7626562061882479,
+    "roc_auc": 0.8210284499405215,
+    "average_precision": 0.29642048110264724,
+    "precision": 0.17442046362909672,
+    "recall": 0.6878940731399747,
+    "f1_score": 0.278280831526591,
+    "confusion_matrix": [
+      [
+        53197,
+        10328
+      ],
+      [
+        990,
+        2182
+      ]
+    ],
+    "support_negative": 63525,
+    "support_positive": 3172
+  },
+  "fit_seconds": 32.075876200000494,
+  "parameters": {
+    "n_estimators": 100,
+    "max_depth": 12,
+    "min_samples_split": 20,
+    "min_samples_leaf": 10,
+    "class_weight": "balanced_subsample"
+  }
+}

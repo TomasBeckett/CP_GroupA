@@ -20,6 +20,14 @@ services:
         sync: false
       - key: AML_DB_SSLMODE
         value: require
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
       - key: AML_APP_USERNAME
         sync: false
       - key: AML_APP_PASSWORD

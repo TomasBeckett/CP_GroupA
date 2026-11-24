@@ -1,0 +1,130 @@
+{
+  "timestamp_utc": "2026-11-24T11:15:42.422891+00:00",
+  "total_seconds": 96.06932740000047,
+  "split_cutoff": "2026-05-18T06:04:42+00:00",
+  "aml_model": {
+    "model_name": "FCIP Anti-Money Laundering Detection Model",
+    "target": "target_aml",
+    "target_typologies": [
+      "P02_STRUCTURING",
+      "P03_RAPID_FUND_MOVEMENT",
+      "P09_MANY_TO_ONE",
+      "P10_UNUSUAL_SETTLEMENT",
+      "P11_CIRCULAR_PATTERN"
+    ],
+    "train_rows": 266803,
+    "test_rows": 66697,
+    "train_metrics": {
+      "accuracy": 0.886575488281616,
+      "balanced_accuracy": 0.8168961472202807,
+      "roc_auc": 0.929008613408862,
+      "average_precision": 0.5856361193596286,
+      "precision": 0.30009858516959315,
+      "recall": 0.7382185226453432,
+      "f1_score": 0.42672577100856257,
+      "confusion_matrix": [
+        [
+          225278,
+          26268
+        ],
+        [
+          3994,
+          11263
+        ]
+      ],
+      "support_negative": 251546,
+      "support_positive": 15257
+    },
+    "test_metrics": {
+      "accuracy": 0.8824534836649325,
+      "balanced_accuracy": 0.781938240535259,
+      "roc_auc": 0.8964488071393188,
+      "average_precision": 0.4202232783251778,
+      "precision": 0.2749642974843458,
+      "recall": 0.668714934544483,
+      "f1_score": 0.3896932897399969,
+      "confusion_matrix": [
+        [
+          56354,
+          6600
+        ],
+        [
+          1240,
+          2503
+        ]
+      ],
+      "support_negative": 62954,
+      "support_positive": 3743
+    },
+    "fit_seconds": 35.476791299999604,
+    "parameters": {
+      "n_estimators": 100,
+      "max_depth": 12,
+      "min_samples_split": 20,
+      "min_samples_leaf": 10,
+      "class_weight": "balanced_subsample"
+    }
+  },
+  "fraud_model": {
+    "model_name": "FCIP Fraud Detection Model",
+    "target": "target_fraud",
+    "target_typologies": [
+      "P04_SUDDEN_SPIKE",
+      "P05_DORMANT_REACTIVATION",
+      "P06_HIGH_VELOCITY",
+      "P07_SHARED_DEVICE_NETWORK"
+    ],
+    "train_rows": 266803,
+    "test_rows": 66697,
+    "train_metrics": {
+      "accuracy": 0.828420220162442,
+      "balanced_accuracy": 0.7794588628889219,
+      "roc_auc": 0.8832503515279491,
+      "average_precision": 0.4277806169630821,
+      "precision": 0.180456961092362,
+      "recall": 0.7252884315559713,
+      "f1_score": 0.28900692697170194,
+      "confusion_matrix": [
+        [
+          211721,
+          42254
+        ],
+        [
+          3524,
+          9304
+        ]
+      ],
+      "support_negative": 253975,
+      "support_positive": 12828
+    },
+    "test_metrics": {
+      "accuracy": 0.8303072102193502,
+      "balanced_accuracy": 0.7626562061882479,
+      "roc_auc": 0.8210284499405215,
+      "average_precision": 0.29642048110264724,
+      "precision": 0.17442046362909672,
+      "recall": 0.6878940731399747,
+      "f1_score": 0.278280831526591,
+      "confusion_matrix": [
+        [
+          53197,
+          10328
+        ],
+        [
+          990,
+          2182
+        ]
+      ],
+      "support_negative": 63525,
+      "support_positive": 3172
+    },
+    "fit_seconds": 32.075876200000494,
+    "parameters": {
+      "n_estimators": 100,
+      "max_depth": 12,
+      "min_samples_split": 20,
+      "min_samples_leaf": 10,
+      "class_weight": "balanced_subsample"
+    }
+  }
+}

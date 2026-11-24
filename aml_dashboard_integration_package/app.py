@@ -5,6 +5,7 @@ The model should be in the same directory as this file.
 """
 from __future__ import annotations
 
+import datetime
 import hmac
 import math
 import os
@@ -20,11 +21,35 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
+from auth_service import (
+    ALLOWED_ROLES,
+    ALLOWED_STATUSES,
+    MOCK_USERS,
+    SUPABASE_ANON_KEY,
+    SUPABASE_URL,
+    generate_jwt,
+    get_auth_config,
+    get_user_profile,
+    hash_password,
+    is_supabase_configured,
+    list_audit_logs,
+    list_users,
+    record_audit,
+    require_auth,
+    save_user_profile,
+    verify_jwt,
+)
+
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR.parent / ".env")
-MODEL_PATH = Path(os.environ.get(
+AML_MODEL_PATH = Path(os.environ.get(
     "AML_MODEL_PATH",
     BASE_DIR / "models" / "aml_random_forest_pipeline_trained.joblib",
+)).expanduser().resolve()
+MODEL_PATH = AML_MODEL_PATH
+FRAUD_MODEL_PATH = Path(os.environ.get(
+    "FRAUD_MODEL_PATH",
+    BASE_DIR / "models" / "fraud_random_forest_pipeline_trained.joblib",
 )).expanduser().resolve()
 DASHBOARD_PATH = "dashboard-aml-fraud-integrated.html"
 DASHBOARD_DIR = BASE_DIR / "dashboard"
@@ -135,7 +160,10 @@ NUMERIC_FEATURES = {
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 model = None
+aml_model = None
+fraud_model = None
 model_load_error: str | None = None
+fraud_model_load_error: str | None = None
 _dataset_lock = threading.RLock()
 _dataset_cache: pd.DataFrame | None = None
 _dataset_cache_signature: tuple[tuple[str, int, str], ...] | None = None
@@ -143,6 +171,13 @@ _dataset_cache_signature: tuple[tuple[str, int, str], ...] | None = None
 
 @app.before_request
 def require_app_auth():
+    # Allow authentication endpoints, public health, and bearer token requests
+    if (
+        request.path.startswith("/api/auth/")
+        or request.path == "/api/health"
+        or request.headers.get("Authorization", "").startswith("Bearer ")
+    ):
+        return None
     if not APP_USERNAME and not APP_PASSWORD:
         return None
     credentials = request.authorization
@@ -164,22 +199,42 @@ def require_app_auth():
     return None
 
 
-def load_pipeline() -> None:
-    """Load the serialized model once; retain any error for the health endpoint."""
-    global model, model_load_error
+def get_db_conn_safe():
+    if not DB_CONFIGURED:
+        return None
     try:
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(f"Model tidak ditemukan: {MODEL_PATH.name}")
-        model = joblib.load(MODEL_PATH)
-        loaded_features = list(getattr(model, "feature_names_in_", []))
-        if loaded_features and loaded_features != FEATURES:
-            raise RuntimeError(
-                "Daftar fitur pipeline tidak cocok dengan skema API. Periksa versi model dan FEATURES di app.py."
-            )
+        return get_database_connection()
+    except Exception:
+        return None
+
+
+def load_pipeline() -> None:
+    """Load both AML and Fraud serialized models; retain any errors for health endpoint."""
+    global model, aml_model, fraud_model, model_load_error, fraud_model_load_error
+
+    # 1. Load AML Model
+    try:
+        if not AML_MODEL_PATH.exists():
+            raise FileNotFoundError(f"Model AML tidak ditemukan: {AML_MODEL_PATH.name}")
+        aml_model = joblib.load(AML_MODEL_PATH)
+        model = aml_model  # alias for backwards compatibility
         model_load_error = None
-    except Exception as exc:  # keep the app running so /api/health can report the issue
+    except Exception as exc:
         model = None
+        aml_model = None
         model_load_error = f"{type(exc).__name__}: {exc}"
+
+    # 2. Load Fraud Detection Model
+    try:
+        if FRAUD_MODEL_PATH.exists():
+            fraud_model = joblib.load(FRAUD_MODEL_PATH)
+            fraud_model_load_error = None
+        else:
+            fraud_model = None
+            fraud_model_load_error = f"Model Fraud belum dilatih: {FRAUD_MODEL_PATH.name}"
+    except Exception as exc:
+        fraud_model = None
+        fraud_model_load_error = f"{type(exc).__name__}: {exc}"
 
 
 load_pipeline()
@@ -189,6 +244,7 @@ def model_metadata() -> dict[str, Any]:
     if model is None:
         return {}
     classifier = getattr(model, "named_steps", {}).get("classifier")
+    fraud_classifier = getattr(fraud_model, "named_steps", {}).get("classifier") if fraud_model else None
     return {
         "model_type": type(classifier).__name__ if classifier is not None else type(model).__name__,
         "feature_count": len(FEATURES),
@@ -201,6 +257,20 @@ def model_metadata() -> dict[str, Any]:
             "Indikasi potensi fraud berdasarkan label sintetis SUSPICIOUS; "
             "bukan fraud terkonfirmasi."
         ),
+        "dual_models": {
+            "aml_model": {
+                "available": aml_model is not None,
+                "type": type(classifier).__name__ if classifier is not None else None,
+                "max_depth": getattr(classifier, "max_depth", None),
+                "n_estimators": getattr(classifier, "n_estimators", None),
+            },
+            "fraud_model": {
+                "available": fraud_model is not None,
+                "type": type(fraud_classifier).__name__ if fraud_classifier is not None else None,
+                "max_depth": getattr(fraud_classifier, "max_depth", None),
+                "n_estimators": getattr(fraud_classifier, "n_estimators", None),
+            },
+        },
     }
 
 
@@ -777,6 +847,21 @@ def database_health():
 
 @app.post("/api/datasets/upload")
 def upload_transactions():
+    # Role-Based Access Control: Only AML Analyst and Admin can upload datasets
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            tok_payload = verify_jwt(auth_header[7:].strip())
+            user_role = tok_payload.get("role", "analyst")
+            if user_role not in ("analyst", "admin"):
+                return jsonify({
+                    "ok": False,
+                    "error": f"Akses ditolak. Role '{user_role}' tidak berwenang mengunggah dataset transaksi. Hanya AML Analyst dan Admin yang memiliki hak akses ini.",
+                    "code": "FORBIDDEN_ROLE",
+                }), 403
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"Token autentikasi tidak valid ({exc})."}), 401
+
     if model is None:
         return jsonify({
             "ok": False,
@@ -1173,8 +1258,11 @@ def predict():
 
     row: dict[str, Any] = {}
     for feature in FEATURES:
-        value = transaction.get(feature, np.nan)
-        if value is None or value == "":
+        if feature not in transaction:
+            row[feature] = np.nan
+            continue
+        value = transaction[feature]
+        if value is None or value == "" or (isinstance(value, float) and math.isnan(value)):
             row[feature] = np.nan
             continue
         if feature in NUMERIC_FEATURES:
@@ -1195,15 +1283,28 @@ def predict():
 
     frame = pd.DataFrame([row], columns=FEATURES)
     try:
-        probabilities = model.predict_proba(frame)[0]
-        classes = list(model.classes_)
-        suspicious_index = next((i for i, cls in enumerate(classes) if str(cls) == "1"), None)
-        if suspicious_index is None:
-            return jsonify({
-                "ok": False,
-                "error": "Pipeline tidak memiliki kelas target 1. Pastikan label 1 memang berarti SUSPICIOUS.",
-            }), 500
-        score = float(probabilities[suspicious_index])
+        aml_score = 0.0
+        fraud_score = 0.0
+
+        # Scoring AML Model
+        target_aml = aml_model or model
+        if target_aml is not None:
+            aml_proba = target_aml.predict_proba(frame)[0]
+            classes = list(target_aml.classes_)
+            idx = next((i for i, cls in enumerate(classes) if str(cls) == "1"), 1 if len(classes) > 1 else 0)
+            aml_score = float(aml_proba[idx])
+
+        # Scoring Fraud Model
+        if fraud_model is not None:
+            fraud_proba = fraud_model.predict_proba(frame)[0]
+            f_classes = list(fraud_model.classes_)
+            f_idx = next((i for i, cls in enumerate(f_classes) if str(cls) == "1"), 1 if len(f_classes) > 1 else 0)
+            fraud_score = float(fraud_proba[f_idx])
+        else:
+            fraud_score = aml_score
+
+        # Overall risk score is maximum of both risks
+        score = max(aml_score, fraud_score)
     except Exception as exc:
         return jsonify({
             "ok": False,
@@ -1221,21 +1322,511 @@ def predict():
         ),
         "risk_score": round(score, 6),
         "risk_percent": round(score * 100, 2),
+        "aml_risk_score": round(aml_score, 6),
+        "aml_risk_percent": round(aml_score * 100, 2),
+        "aml_prediction": "SUSPICIOUS" if aml_score >= threshold else "NORMAL",
+        "fraud_risk_score": round(fraud_score, 6),
+        "fraud_risk_percent": round(fraud_score * 100, 2),
+        "fraud_prediction": "SUSPICIOUS" if fraud_score >= threshold else "NORMAL",
         "threshold": threshold,
         "provided_feature_count": len(provided),
         "total_feature_count": len(FEATURES),
         "missing_features": missing,
         "missing_feature_count": len(missing),
         "warning": (
-            "Model mempelajari label sintetis SUSPICIOUS sebagai proxy potensi fraud, "
-            "bukan fraud terkonfirmasi. Sebagian fitur tidak diberikan dan diisi oleh preprocessing pipeline. "
-            "Gunakan semua fitur yang tersedia dan validasi model sebelum memakai skor untuk keputusan operasional."
+            "Model ganda mengevaluasi risiko AML dan Fraud secara simultan. "
+            "Sebagian fitur tidak diberikan dan diisi oleh preprocessing pipeline."
             if missing else
-            "Label positif adalah proxy potensi fraud dari data sintetis SUSPICIOUS, bukan fraud terkonfirmasi. "
-            "Validasi performa dan ambang batas model sebelum penggunaan operasional."
+            "Model ganda mengevaluasi risiko AML dan Fraud secara simultan."
         ),
         "model": model_metadata(),
     })
+
+
+# =====================================================================
+# AUTHENTICATION & ROLE-BASED ACCESS CONTROL (RBAC) ROUTES
+# =====================================================================
+
+@app.get("/api/auth/config")
+def auth_config():
+    """Return public Supabase and Auth client configuration (never exposes service key)."""
+    return jsonify(get_auth_config())
+
+
+@app.post("/api/auth/register")
+def auth_register():
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password") or ""
+    full_name = (payload.get("full_name") or "").strip()
+    requested_role = (payload.get("requested_role") or "analyst").strip().lower()
+
+    if not email or "@" not in email:
+        return jsonify({"ok": False, "error": "Email valid diperlukan."}), 400
+    if len(password) < 8:
+        return jsonify({"ok": False, "error": "Kata sandi minimal 8 karakter."}), 400
+    if not full_name:
+        return jsonify({"ok": False, "error": "Nama lengkap wajib diisi."}), 400
+    if requested_role not in ALLOWED_ROLES:
+        return jsonify({"ok": False, "error": f"Role yang diminta tidak valid. Pilihan: {', '.join(sorted(ALLOWED_ROLES))}."}), 400
+
+    existing = get_user_profile(email, get_db_conn_safe)
+    if existing:
+        return jsonify({"ok": False, "error": "Email ini sudah terdaftar. Silakan gunakan email lain atau login."}), 409
+
+    # If Supabase is configured, call Supabase Auth API
+    supabase_user_id = str(uuid4())
+    if is_supabase_configured():
+        try:
+            import requests
+            supa_resp = requests.post(
+                f"{SUPABASE_URL}/auth/v1/signup",
+                headers={"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"},
+                json={
+                    "email": email,
+                    "password": password,
+                    "data": {
+                        "full_name": full_name,
+                        "requested_role": requested_role,
+                        "status": "pending",
+                    },
+                },
+                timeout=6,
+            )
+            if supa_resp.status_code in (200, 201):
+                supa_data = supa_resp.json()
+                supabase_user_id = supa_data.get("id") or supa_data.get("user", {}).get("id") or supabase_user_id
+        except Exception:
+            pass
+
+    user = {
+        "id": supabase_user_id,
+        "email": email,
+        "full_name": full_name,
+        "password_hash": hash_password(password),
+        "role": "analyst",  # Default baseline role until admin explicitly approves and assigns actual role
+        "requested_role": requested_role,
+        "status": "pending",  # Always pending until approved by Admin
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "approved_at": None,
+        "approved_by": None,
+        "last_login_at": None,
+    }
+    save_user_profile(user, get_db_conn_safe)
+    record_audit(
+        action="USER_REGISTERED",
+        target_type="user",
+        target_id=email,
+        details={"requested_role": requested_role, "full_name": full_name},
+        actor_email=email,
+        actor_name=full_name,
+        actor_role="guest",
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+
+    return jsonify({
+        "ok": True,
+        "status": "pending",
+        "message": (
+            "Pendaftaran akun berhasil! Akun Anda berstatus PENDING dan sedang menunggu "
+            "persetujuan Administrator untuk verifikasi role dan aktivasi akses."
+        ),
+        "user": {
+            "id": supabase_user_id,
+            "email": email,
+            "full_name": full_name,
+            "requested_role": requested_role,
+            "status": "pending",
+        },
+    }), 201
+
+
+@app.post("/api/auth/login")
+def auth_login():
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"ok": False, "error": "Email dan kata sandi wajib diisi."}), 400
+
+    user = get_user_profile(email, get_db_conn_safe)
+
+    # If Supabase is configured, verify with Supabase Auth API
+    supabase_token = None
+    if is_supabase_configured():
+        try:
+            import requests
+            supa_resp = requests.post(
+                f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+                headers={"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"},
+                json={"email": email, "password": password},
+                timeout=6,
+            )
+            if supa_resp.status_code == 200:
+                supa_data = supa_resp.json()
+                supabase_token = supa_data.get("access_token")
+                user_info = supa_data.get("user", {})
+                if not user:
+                    user = {
+                        "id": user_info.get("id"),
+                        "email": email,
+                        "full_name": user_info.get("user_metadata", {}).get("full_name", email),
+                        "role": user_info.get("user_metadata", {}).get("role", "analyst"),
+                        "status": user_info.get("user_metadata", {}).get("status", "pending"),
+                    }
+            elif not user:
+                return jsonify({"ok": False, "error": "Email atau kata sandi tidak cocok."}), 401
+        except Exception:
+            pass
+
+    if not user:
+        return jsonify({"ok": False, "error": "Akun tidak ditemukan. Silakan registrasi terlebih dahulu."}), 404
+
+    # If local mock mode, verify password hash
+    if not supabase_token and user.get("password_hash"):
+        if hash_password(password) != user["password_hash"]:
+            return jsonify({"ok": False, "error": "Email atau kata sandi salah."}), 401
+
+    # Status check
+    status = user.get("status", "pending")
+    if status == "pending":
+        return jsonify({
+            "ok": False,
+            "error": "Akun Anda masih berstatus PENDING dan menunggu persetujuan Administrator.",
+            "status": "pending",
+            "code": "ACCOUNT_PENDING",
+        }), 403
+
+    if status in ("suspended", "rejected"):
+        return jsonify({
+            "ok": False,
+            "error": "Akun Anda telah dinonaktifkan atau ditolak oleh Administrator. Hubungi admin untuk informasi lebih lanjut.",
+            "status": status,
+            "code": "ACCOUNT_INACTIVE",
+        }), 403
+
+    # Role validation: validasi kecocokan role yang dipilih dengan role akun di database
+    selected_role = (payload.get("role") or payload.get("selected_role") or "").strip().lower()
+    user_role = user.get("role", "analyst")
+    if selected_role and selected_role != user_role:
+        role_display = {
+            "admin": "Administrator",
+            "analyst": "AML Analyst",
+            "investigator": "AML Investigator",
+            "supervisor": "AML Supervisor",
+            "auditor": "Compliance Auditor",
+        }
+        actual_name = role_display.get(user_role, user_role.upper())
+        selected_name = role_display.get(selected_role, selected_role.upper())
+        return jsonify({
+            "ok": False,
+            "error": f"Role tidak cocok: Akun '{email}' terdaftar sebagai {actual_name}, tidak diizinkan login sebagai {selected_name}. Silakan pilih role yang sesuai dengan akun Anda di database.",
+            "code": "ROLE_MISMATCH",
+            "actual_role": user_role,
+            "selected_role": selected_role,
+        }), 403
+
+    # Generate token
+    token = supabase_token or generate_jwt(user)
+    user["last_login_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    save_user_profile(user, get_db_conn_safe)
+
+    record_audit(
+        action="USER_LOGIN",
+        target_type="session",
+        target_id=email,
+        details={"role": user.get("role")},
+        actor_email=email,
+        actor_name=user.get("full_name", email),
+        actor_role=user.get("role", "analyst"),
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+
+    return jsonify({
+        "ok": True,
+        "access_token": token,
+        "token": token,
+        "token_type": "Bearer",
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "full_name": user.get("full_name", email),
+            "role": user.get("role", "analyst"),
+            "status": user.get("status", "active"),
+            "last_login_at": user.get("last_login_at"),
+        },
+    })
+
+
+@app.post("/api/auth/forgot-password")
+def auth_forgot_password():
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"ok": False, "error": "Email wajib diisi."}), 400
+
+    if is_supabase_configured():
+        try:
+            import requests
+            requests.post(
+                f"{SUPABASE_URL}/auth/v1/recover",
+                headers={"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"},
+                json={"email": email},
+                timeout=6,
+            )
+        except Exception:
+            pass
+
+    record_audit(
+        action="PASSWORD_RESET_REQUESTED",
+        target_type="auth",
+        target_id=email,
+        details={"email": email},
+        actor_email=email,
+        actor_name="Guest",
+        actor_role="guest",
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+
+    return jsonify({
+        "ok": True,
+        "message": "Instruksi pemulihan kata sandi telah dikirim ke email Anda jika terdaftar dalam sistem.",
+    })
+
+
+@app.get("/api/auth/me")
+@require_auth(db_conn_func=get_db_conn_safe)
+def auth_me():
+    return jsonify({
+        "ok": True,
+        "user": request.current_user,
+    })
+
+
+@app.post("/api/auth/logout")
+@require_auth(db_conn_func=get_db_conn_safe)
+def auth_logout():
+    user = request.current_user
+    record_audit(
+        action="USER_LOGOUT",
+        target_type="session",
+        target_id=user.get("email", ""),
+        actor_email=user.get("email", ""),
+        actor_name=user.get("full_name", ""),
+        actor_role=user.get("role", "analyst"),
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+    return jsonify({"ok": True, "message": "Berhasil logout."})
+
+
+# --- ADMIN USER MANAGEMENT & GOVERNANCE ROUTES ---
+
+@app.get("/api/admin/users")
+@require_auth(allowed_roles=["admin"], db_conn_func=get_db_conn_safe)
+def admin_list_users():
+    users = list_users(get_db_conn_safe)
+    sanitized = [
+        {k: v for k, v in u.items() if k != "password_hash"}
+        for u in users
+    ]
+    return jsonify({
+        "ok": True,
+        "users": sanitized,
+        "total_count": len(sanitized),
+    })
+
+
+@app.post("/api/admin/users/<user_id>/approve")
+@require_auth(allowed_roles=["admin"], db_conn_func=get_db_conn_safe)
+def admin_approve_user(user_id: str):
+    payload = request.get_json(silent=True) or {}
+    role = (payload.get("role") or "").strip().lower()
+
+    user = get_user_profile(user_id, get_db_conn_safe)
+    if not user:
+        return jsonify({"ok": False, "error": "Pengguna tidak ditemukan."}), 404
+
+    target_role = role or user.get("requested_role") or "analyst"
+    if target_role not in ALLOWED_ROLES:
+        return jsonify({"ok": False, "error": f"Role '{target_role}' tidak valid."}), 400
+
+    admin_user = request.current_user
+    user["status"] = "active"
+    user["role"] = target_role
+    user["approved_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    user["approved_by"] = admin_user.get("id")
+
+    save_user_profile(user, get_db_conn_safe)
+    record_audit(
+        action="USER_APPROVED",
+        target_type="user",
+        target_id=user["email"],
+        details={"assigned_role": target_role, "approved_by": admin_user.get("email")},
+        actor_email=admin_user.get("email"),
+        actor_name=admin_user.get("full_name"),
+        actor_role="admin",
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+
+    return jsonify({
+        "ok": True,
+        "message": f"Akun {user['email']} berhasil disetujui dengan role {target_role}.",
+        "user": {k: v for k, v in user.items() if k != "password_hash"},
+    })
+
+
+@app.post("/api/admin/users/<user_id>/reject")
+@require_auth(allowed_roles=["admin"], db_conn_func=get_db_conn_safe)
+def admin_reject_user(user_id: str):
+    user = get_user_profile(user_id, get_db_conn_safe)
+    if not user:
+        return jsonify({"ok": False, "error": "Pengguna tidak ditemukan."}), 404
+
+    admin_user = request.current_user
+    user["status"] = "rejected"
+    save_user_profile(user, get_db_conn_safe)
+
+    record_audit(
+        action="USER_REJECTED",
+        target_type="user",
+        target_id=user["email"],
+        details={"rejected_by": admin_user.get("email")},
+        actor_email=admin_user.get("email"),
+        actor_name=admin_user.get("full_name"),
+        actor_role="admin",
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+
+    return jsonify({
+        "ok": True,
+        "message": f"Pendaftaran akun {user['email']} telah ditolak.",
+        "user": {k: v for k, v in user.items() if k != "password_hash"},
+    })
+
+
+@app.post("/api/admin/users/<user_id>/status")
+@require_auth(allowed_roles=["admin"], db_conn_func=get_db_conn_safe)
+def admin_change_user_status(user_id: str):
+    payload = request.get_json(silent=True) or {}
+    new_status = (payload.get("status") or "").strip().lower()
+
+    if new_status not in ALLOWED_STATUSES:
+        return jsonify({"ok": False, "error": f"Status '{new_status}' tidak valid. Pilihan: {', '.join(sorted(ALLOWED_STATUSES))}."}), 400
+
+    user = get_user_profile(user_id, get_db_conn_safe)
+    if not user:
+        return jsonify({"ok": False, "error": "Pengguna tidak ditemukan."}), 404
+
+    admin_user = request.current_user
+    if user.get("id") == admin_user.get("id") and new_status != "active":
+        return jsonify({"ok": False, "error": "Anda tidak dapat menonaktifkan akun Admin Anda sendiri."}), 400
+
+    old_status = user.get("status")
+    user["status"] = new_status
+    save_user_profile(user, get_db_conn_safe)
+
+    record_audit(
+        action="USER_STATUS_CHANGED",
+        target_type="user",
+        target_id=user["email"],
+        details={"old_status": old_status, "new_status": new_status},
+        actor_email=admin_user.get("email"),
+        actor_name=admin_user.get("full_name"),
+        actor_role="admin",
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+
+    return jsonify({
+        "ok": True,
+        "message": f"Status akun {user['email']} berhasil diubah menjadi {new_status}.",
+        "user": {k: v for k, v in user.items() if k != "password_hash"},
+    })
+
+
+@app.post("/api/admin/users/<user_id>/role")
+@require_auth(allowed_roles=["admin"], db_conn_func=get_db_conn_safe)
+def admin_change_user_role(user_id: str):
+    payload = request.get_json(silent=True) or {}
+    new_role = (payload.get("role") or "").strip().lower()
+
+    if new_role not in ALLOWED_ROLES:
+        return jsonify({"ok": False, "error": f"Role '{new_role}' tidak valid. Pilihan: {', '.join(sorted(ALLOWED_ROLES))}."}), 400
+
+    user = get_user_profile(user_id, get_db_conn_safe)
+    if not user:
+        return jsonify({"ok": False, "error": "Pengguna tidak ditemukan."}), 404
+
+    admin_user = request.current_user
+    old_role = user.get("role")
+    user["role"] = new_role
+    save_user_profile(user, get_db_conn_safe)
+
+    record_audit(
+        action="USER_ROLE_CHANGED",
+        target_type="user",
+        target_id=user["email"],
+        details={"old_role": old_role, "new_role": new_role},
+        actor_email=admin_user.get("email"),
+        actor_name=admin_user.get("full_name"),
+        actor_role="admin",
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+
+    return jsonify({
+        "ok": True,
+        "message": f"Role akun {user['email']} berhasil diubah dari {old_role} menjadi {new_role}.",
+        "user": {k: v for k, v in user.items() if k != "password_hash"},
+    })
+
+
+# --- AUDIT LOGS ENDPOINTS ---
+
+@app.get("/api/audit-logs")
+@require_auth(allowed_roles=["admin", "supervisor", "auditor"], db_conn_func=get_db_conn_safe)
+def get_audit_logs():
+    limit = request.args.get("limit", 100)
+    try:
+        limit = min(max(1, int(limit)), 500)
+    except (ValueError, TypeError):
+        limit = 100
+    logs = list_audit_logs(limit=limit, db_connection_func=get_db_conn_safe)
+    return jsonify({
+        "ok": True,
+        "count": len(logs),
+        "logs": logs,
+    })
+
+
+@app.post("/api/audit-logs")
+@require_auth(db_conn_func=get_db_conn_safe)
+def post_audit_log():
+    payload = request.get_json(silent=True) or {}
+    action = payload.get("action")
+    if not action:
+        return jsonify({"ok": False, "error": "Action wajib diisi."}), 400
+
+    user = request.current_user
+    record_audit(
+        action=str(action),
+        target_type=str(payload.get("target_type") or "ui"),
+        target_id=str(payload.get("target_id") or "general"),
+        details=payload.get("details") or {},
+        actor_email=user.get("email", ""),
+        actor_name=user.get("full_name", ""),
+        actor_role=user.get("role", "analyst"),
+        ip_address=request.remote_addr or "127.0.0.1",
+        db_connection_func=get_db_conn_safe,
+    )
+    return jsonify({"ok": True, "message": "Log audit tersimpan."})
 
 
 if __name__ == "__main__":

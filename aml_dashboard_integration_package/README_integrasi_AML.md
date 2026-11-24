@@ -117,6 +117,68 @@ Dengan setup ini, teman hanya membuka URL dashboard. PostgreSQL berjalan di Supa
 
 Upload contoh 350 ribu transaksi dapat memerlukan waktu lama dan mungkin melewati batas waktu request hosting. Mulai dari CSV kecil untuk membuktikan alur end-to-end. Untuk demonstrasi besar atau penggunaan berkelanjutan, pindahkan upload/prediksi ke background job dan gunakan hosting/database yang kapasitasnya sesuai.
 
+## Autentikasi & Role-Based Access Control (RBAC)
+
+Sistem telah dilengkapi dengan autentikasi berbasis token JWT dan integrasi Supabase Auth, dengan skema **5 Role Operasional** dan pemisahan tugas (*Segregation of Duties*):
+
+1. **Administrator (`admin`)**:
+   - Hak akses penuh manajemen pengguna (`/api/admin/users`).
+   - Persetujuan/penolakan registrasi akun baru (Approval Queue).
+   - Penugasan dan perubahan role pengguna.
+   - Pemantauan live audit feed sistem.
+2. **AML Analyst (`analyst`)**:
+   - Eksplorasi data, pengunggahan dataset transaksi (`/api/datasets/upload`).
+   - Eksekusi AI feature engineering pipeline dan prediksi model.
+   - Analisis model health dan risk threshold tuning.
+3. **AML Investigator (`investigator`)**:
+   - Triage alert queue dan investigasi mendalam transaksi mencurigakan.
+   - Pengelolaan active cases, penulisan investigative notes.
+   - Penyusunan draft STR (Suspicious Transaction Report) untuk PPATK.
+4. **Supervisor (`supervisor`)**:
+   - Monitoring throughput dan performa tim analis & investigator.
+   - Review dan sign-off terhadap kasus yang dieskalasi (*Escalated Cases Approval Queue*).
+   - Penugasan alert/kasus ke investigator dan disposisi pelaporan regulator.
+5. **Auditor (`auditor`)**:
+   - Akses **Read-Only** ke seluruh riwayat audit trail (`/api/audit-logs`), log model, dan kepatuhan.
+   - Semua tombol aksi/edit/unggah otomatis dinonaktifkan untuk role Auditor guna menjamin integritas pembuktian.
+
+### Akun Demo Bawaan
+
+Aplikasi menyediakan tombol "Quick Demo Login" satu-klik pada formulir login:
+- **Admin**: `admin@fcip.id` (Password: `Password123!`)
+- **Analyst**: `analyst@fcip.id` (Password: `Password123!`)
+- **Investigator**: `investigator@fcip.id` (Password: `Password123!`)
+- **Supervisor**: `supervisor@fcip.id` (Password: `Password123!`)
+- **Auditor**: `auditor@fcip.id` (Password: `Password123!`)
+
+### Alur Registrasi & Approval Admin
+1. Pengguna mendaftar melalui form Register. Akun yang baru terdaftar berstatus `PENDING`.
+2. Pengguna dengan status `PENDING` tidak dapat login ke dashboard operasional.
+3. Administrator masuk ke dashboard Admin, melihat notifikasi di **Pending Approval Queue**, memverifikasi data dan menentukan role aktif, lalu menekan **Approve**.
+4. Setelah disetujui, akun aktif dan pengguna dapat login sesuai role yang diberikan.
+
+### Endpoint API Autentikasi & RBAC
+- `GET /api/auth/config` — Informasi mode auth (Supabase vs Local Demo).
+- `POST /api/auth/register` — Registrasi akun baru (default status pending).
+- `POST /api/auth/login` — Login pengguna, mengembalikan token JWT dan data role.
+- `POST /api/auth/forgot-password` — Permintaan reset kata sandi.
+- `GET /api/auth/me` — Membaca profil pengguna dari token Bearer JWT.
+- `POST /api/auth/logout` — Logout sesi dan pencatatan audit log.
+- `GET /api/admin/users` — Daftar seluruh pengguna & status (khusus role `admin`).
+- `POST /api/admin/users/<id>/approve` — Menyetujui akun pending & menetapkan role (khusus role `admin`).
+- `POST /api/admin/users/<id>/reject` — Menolak registrasi (khusus role `admin`).
+- `POST /api/admin/users/<id>/status` — Mengubah status akun (active / suspended) (khusus role `admin`).
+- `POST /api/admin/users/<id>/role` — Memperbarui role pengguna (khusus role `admin`).
+- `GET /api/audit-logs` — Membaca catatan aktivitas audit trail (role `admin` dan `auditor`).
+- `POST /api/audit-logs` — Mencatat event audit trail baru.
+
+### Menjalankan Test Verifikasi Otomatis
+Jalankan suite verifikasi 9 modul yang mencakup seluruh endpoint, RBAC, approval, model, dan integritas frontend:
+
+```powershell
+py -3.11 test_verification.py
+```
+
 ## Batasan yang penting
 
 - Kasus, rule, laporan, akun demo, kalender, chart, dan metrik operasional merupakan data contoh untuk prototipe. Perubahan pada modul tersebut hanya disimpan sementara di memori browser, bukan database.
