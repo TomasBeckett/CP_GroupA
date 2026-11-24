@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Dashboard prototipe Anti-Money Laundering untuk peninjauan peringatan dan uji prediksi model Random Forest.">
+<title>FCIP Indonesia — AML & Fraud Detection</title>
+<style>
+:root{color-scheme:dark;--bg:#070b14;--panel:#0e1424;--panel2:#131b30;--border:#26324f;--text:#e6ecff;--muted:#97a3c4;--cyan:#22d3ee;--green:#4ade80;--amber:#fbbf24;--red:#ff526c;--radius:14px;--shadow:0 16px 40px #0002}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 85% -10%,#0d2a3d55,transparent),var(--bg);color:var(--text);font:14px/1.5 "Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 24px;border-bottom:1px solid var(--border)}.brand{display:flex;align-items:center;gap:11px;font-weight:750;font-size:17px}.brand svg{width:34px;height:34px;flex:none}.brand small{display:block;color:var(--muted);font-size:12px;font-weight:400}.top-status{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:6px 11px;color:var(--muted);font-size:12px}.dot{width:7px;height:7px;border-radius:99px;background:currentColor}.pill.ready{color:var(--green);border-color:#4ade8055}.pill.error{color:var(--red);border-color:#ff526c55}.pill.wait{color:var(--amber);border-color:#fbbf2455}.notice{max-width:1550px;margin:14px auto 0;padding:0 24px;color:var(--muted);font-size:12.5px}main{display:grid;grid-template-columns:minmax(330px,5fr) minmax(0,7fr);gap:16px;padding:16px 24px 26px;max-width:1600px;margin:auto}section.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;min-width:0;box-shadow:var(--shadow)}h1{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}h2{margin:0 0 13px;font-size:16px;display:flex;align-items:center;justify-content:space-between;gap:10px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);font-weight:650}.tag{font-size:11px;padding:3px 8px;border-radius:99px;border:1px solid var(--border);color:var(--muted);font-weight:500;white-space:nowrap}.tag.cyan{border-color:#22d3ee66;color:var(--cyan)}.tag.green{border-color:#4ade8055;color:var(--green)}.tag.amber{border-color:#fbbf2455;color:var(--amber)}.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}.filters input{grid-column:1/-1}input[type=search],select,input[type=number],textarea{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:9px 11px}textarea{resize:vertical;min-height:320px;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2}input::placeholder,textarea::placeholder{color:#687595}#count{color:var(--muted);font-size:12px;margin:4px 0 8px}#list{display:flex;flex-direction:column;gap:8px;max-height:390px;overflow:auto;padding:2px}.alert-item{display:grid;grid-template-columns:5px minmax(0,1fr) auto;gap:10px;text-align:left;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 11px 10px 0;width:100%;overflow:hidden;transition:border-color .15s}.alert-item:hover{border-color:#46577f}.alert-item[aria-current=true]{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset}.bar{border-radius:0 4px 4px 0}.alert-item.high .bar{background:var(--red)}.alert-item.medium .bar{background:var(--amber)}.alert-item.low .bar{background:var(--green)}.alert-main{min-width:0}.alert-main b{font-size:12.5px}.alert-main .customer{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.meta{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:5px;color:var(--muted);font-size:11px}.badge{display:inline-block;padding:1px 7px;border:1px solid;border-radius:99px;font-size:11px}.pending{color:var(--amber);border-color:#fbbf2466}.investigating{color:var(--cyan);border-color:#22d3ee66}.done{color:var(--green);border-color:#4ade8066}.score{font-size:18px;font-weight:750;text-align:right}.high .score{color:var(--red)}.medium .score{color:var(--amber)}.low .score{color:var(--green)}.score small{display:block;font-size:10.5px;color:var(--muted);font-weight:500}#detail{margin-top:12px;border:1px dashed var(--border);border-radius:10px;padding:12px;min-height:108px}dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 12px;margin:9px 0 3px}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}.detail-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.small-label{font-size:12px;color:var(--muted)}.btn{background:var(--cyan);color:#04141a;border:0;border-radius:9px;padding:10px 15px;font-weight:750;transition:filter .15s,transform .1s}.btn:hover{filter:brightness(1.08)}.btn:active{transform:scale(.98)}.btn:disabled{opacity:.5;cursor:not-allowed}.btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border);font-weight:550}.btn.row-btn{padding:7px 11px;font-size:12px}.button-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:10px 0 14px}.stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:11px;min-width:0}.stat .label{color:var(--muted);font-size:11px}.stat strong{display:block;font-size:20px;margin:3px 0;overflow-wrap:anywhere}.stat small{color:var(--muted);font-size:11px}.callout{margin:11px 0;padding:10px 12px;border:1px solid #22d3ee33;border-radius:10px;background:#22d3ee0b;color:#bdf3fb;font-size:12px}.callout.warning{background:#fbbf240b;border-color:#fbbf2444;color:#f9df9c}.api-info{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:11px 12px;background:var(--panel2)}.api-info p{margin:2px 0;color:var(--muted);font-size:12px}.json-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:16px 0 7px}.json-head label{font-weight:650}.threshold-row{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px;align-items:end;margin-top:12px}.field-label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}.result{display:none;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}.result.show{display:block}.result-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.result-label{font-weight:800;font-size:17px}.result-label.suspicious{color:var(--red)}.result-label.normal{color:var(--green)}.risk-num{font-size:28px;font-weight:800;color:var(--cyan);font-variant-numeric:tabular-nums}.meter{height:8px;margin:8px 0 12px;border-radius:99px;overflow:hidden;background:#25304a}.meter span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--amber),var(--red));transition:width .3s}.result-message{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.result dl{font-size:12px}.error-text{color:#ff9cab}.footnote{font-size:11.5px;color:var(--muted);margin-top:12px}footer{text-align:center;color:var(--muted);font-size:11.5px;padding:0 20px 24px}.empty{padding:22px 10px;text-align:center;color:var(--muted)}@media(max-width:1050px){main{grid-template-columns:1fr;padding:12px}.notice{padding:0 12px}#list{max-height:340px}}@media(max-width:600px){header{padding:14px}.top-status{width:100%}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stat{padding:9px}.stat strong{font-size:17px}section.panel{padding:12px}.threshold-row{grid-template-columns:1fr 100px}.filters{grid-template-columns:1fr}.filters input{grid-column:auto}textarea{min-height:260px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2.5 4.5 8v8.5c0 8 5.4 13.9 13.5 17 8.1-3.1 13.5-9 13.5-17V8z" fill="none" stroke="#22d3ee" stroke-width="2"/><path d="m11 18 4.5 4.5L25 12.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>FCIP Indonesia<small>Anti-Pencucian Uang &amp; Deteksi Fraud</small></div>
+  </div>
+  <div class="top-status">
+    <span id="apiPill" class="pill wait"><span class="dot"></span><span id="apiPillText">Memeriksa API...</span></span>
+    <button id="refreshHealth" class="btn secondary row-btn" type="button">Periksa koneksi</button>
+  </div>
+</header>
+<div class="notice"><strong>Catatan prototipe:</strong> daftar peringatan di sebelah kiri adalah data contoh. Panel kanan memanggil pipeline Random Forest melalui backend Python ketika API tersedia; dashboard ini tidak melatih ulang model.</div>
+<main>
+  <h1>Dashboard Anti-Money Laundering dan Fraud Detection</h1>
+  <section class="panel" aria-labelledby="alertsHeading">
+    <h2 id="alertsHeading">Peringatan Transaksi <span class="tag amber">Data contoh</span></h2>
+    <div class="filters">
+      <input id="searchAlerts" type="search" placeholder="Cari ID transaksi atau nasabah" aria-label="Cari peringatan transaksi">
+      <select id="riskFilter" aria-label="Filter tingkat risiko"><option value="">Semua tingkat risiko</option><option value="high">Risiko tinggi</option><option value="medium">Risiko sedang</option><option value="low">Risiko rendah</option></select>
+      <select id="statusFilter" aria-label="Filter status penanganan"><option value="">Semua status</option><option>Menunggu</option><option>Sedang Diinvestigasi</option><option>Selesai</option></select>
+    </div>
+    <div id="count" aria-live="polite"></div>
+    <div id="list"></div>
+    <div id="detail" aria-live="polite"><span class="small-label">Pilih satu peringatan untuk melihat detailnya.</span></div>
+    <p class="footnote">Perubahan status pada daftar contoh hanya tersimpan sementara di browser dan belum dicatat ke database.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="modelHeading">
+    <h2 id="modelHeading">Model AI · Random Forest <span id="modelTag" class="tag amber">Memeriksa</span></h2>
+    <div class="api-info">
+      <div><strong id="modelStatusTitle">Memeriksa kesiapan model</strong><p id="modelStatusText">Menghubungi endpoint /api/health...</p></div>
+      <span id="modelType" class="tag">Backend Python</span>
+    </div>
+    <div class="stats" aria-label="Metadata pipeline model">
+      <div class="stat"><span class="label">Jumlah pohon</span><strong id="treeCount">—</strong><small>n_estimators</small></div>
+      <div class="stat"><span class="label">Kedalaman maksimum</span><strong id="depthCount">—</strong><small>max_depth</small></div>
+      <div class="stat"><span class="label">Fitur model</span><strong id="featureCount">46</strong><small>skema pipeline</small></div>
+    </div>
+    <div class="callout warning">Skor risiko adalah probabilitas dari model, bukan bukti tindak pidana. Ambang batas, kualitas data, false positive, dan performa validasi harus ditinjau sebelum penggunaan operasional.</div>
+
+    <div class="json-head"><label for="transactionJson">Input transaksi (JSON)</label><button id="loadExample" class="btn secondary row-btn" type="button">Muat contoh</button></div>
+    <textarea id="transactionJson" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="jsonHelp"></textarea>
+    <p id="jsonHelp" class="footnote">Skema model memiliki 46 fitur. Kolom yang tidak diisi akan diproses sebagai nilai hilang oleh pipeline, tetapi hasil bisa kurang andal jika fitur penting tidak tersedia. Nilai kategori pada contoh dipilih dari kategori yang ditemukan dalam encoder model.</p>
+    <div class="threshold-row">
+      <div><label class="field-label" for="threshold">Ambang klasifikasi SUSPICIOUS (%)</label><input id="threshold" type="number" min="0" max="100" step="5" value="50"></div>
+      <button id="predictButton" class="btn" type="button">Prediksi Risiko</button>
+    </div>
+    <div id="predictionResult" class="result" aria-live="polite" aria-atomic="true">
+      <div class="result-head"><span id="predictionLabel" class="result-label">—</span><span id="riskNumber" class="risk-num">—</span></div>
+      <div class="meter" aria-label="Skor risiko"><span id="riskMeter"></span></div>
+      <div id="predictionMessage" class="result-message"></div>
+      <dl><dt>Fitur terisi</dt><dd id="providedCount">—</dd><dt>Fitur kosong</dt><dd id="missingCount">—</dd><dt>Ambang batas</dt><dd id="thresholdUsed">—</dd></dl>
+    </div>
+    <div id="predictionError" class="callout warning" hidden role="alert"></div>
+    <p class="footnote">Tombol di panel ini menjalankan <code>predict_proba</code> pada backend. Ini bukan proses training. Pelatihan ulang memerlukan dataset dan endpoint pelatihan tersendiri.</p>
+  </section>
+</main>
+<footer>FCIP Indonesia · Prototipe pengawasan AML. Jangan gunakan untuk keputusan keuangan atau pelaporan tanpa validasi, kontrol akses, logging, dan peninjauan manusia.</footer>
+<script>
+'use strict';
+const $ = (selector) => document.querySelector(selector);
+const formatter = new Intl.NumberFormat('id-ID');
+const alerts = [
+  {id:'TRX-0412',amount:1850000000,customer:'Nasabah Contoh 01',score:94,time:'26 Okt 2026, 09:14',status:'Menunggu',reason:'Transfer bernilai tinggi ke penerima baru di luar negeri.',severity:'high'},
+  {id:'TRX-0409',amount:495000000,customer:'Nasabah Contoh 02',score:88,time:'26 Okt 2026, 08:52',status:'Sedang Diinvestigasi',reason:'Setoran berulang dalam pola yang perlu ditinjau.',severity:'high'},
+  {id:'TRX-0405',amount:720000000,customer:'Nasabah Contoh 03',score:81,time:'26 Okt 2026, 08:20',status:'Menunggu',reason:'Dana masuk lalu keluar dalam waktu singkat ke beberapa rekening.',severity:'high'},
+  {id:'TRX-0398',amount:215000000,customer:'Nasabah Contoh 04',score:67,time:'25 Okt 2026, 21:45',status:'Sedang Diinvestigasi',reason:'Aktivitas transaksi pada waktu yang tidak biasa.',severity:'medium'},
+  {id:'TRX-0391',amount:98000000,customer:'Nasabah Contoh 05',score:58,time:'25 Okt 2026, 17:03',status:'Menunggu',reason:'Frekuensi transfer meningkat dibanding pola sebelumnya.',severity:'medium'},
+  {id:'TRX-0387',amount:310000000,customer:'Nasabah Contoh 06',score:72,time:'25 Okt 2026, 14:31',status:'Selesai',reason:'Ditandai untuk pemeriksaan; verifikasi dokumen masih berupa contoh.',severity:'medium'},
+  {id:'TRX-0380',amount:45000000,customer:'Nasabah Contoh 07',score:39,time:'25 Okt 2026, 11:10',status:'Selesai',reason:'Contoh aktivitas berisiko rendah.',severity:'low'},
+  {id:'TRX-0374',amount:152000000,customer:'Nasabah Contoh 08',score:51,time:'24 Okt 2026, 16:22',status:'Menunggu',reason:'Perubahan mendadak pada penerima rutin.',severity:'medium'}
+];
+let selectedAlertId = null;
+const exampleTransaction = {
+  "hour": 14,
+  "day_of_week": 1,
+  "log_amount_idr": 18.42,
+  "fx_rate_reference": 1.0,
+  "account_age_days": 540,
+  "customer_tenure_days": 720,
+  "customer_kyc_completeness_score": 0.9,
+  "device_age_days": 180,
+  "merchant_age_days": 1200,
+  "merchant_outlet_count": 3,
+  "prior_tx_count_1h": 2,
+  "prior_tx_count_24h": 8,
+  "prior_amount_idr_1h": 5000000,
+  "prior_amount_idr_24h": 25000000,
+  "prior_in_amount_idr_24h": 10000000,
+  "prior_out_amount_idr_24h": 15000000,
+  "minutes_since_previous_tx": 25,
+  "customer_record_available_at_tx": 1,
+  "device_seen_before_tx": 1,
+  "merchant_opened_before_tx": 1,
+  "direction": "OUT",
+  "currency_original": "IDR",
+  "channel": "MOBILE_APP",
+  "transaction_type": "TRANSFER",
+  "counterparty_country": "ID",
+  "source_system_code": "PAYMENT_GATEWAY",
+  "account_type": "virtual account",
+  "account_currency": "IDR",
+  "account_owner_type": "individu",
+  "customer_occupation": "Employee",
+  "customer_income_band": "10-25M",
+  "customer_nationality": "ID",
+  "customer_kyc_status": "VERIFIED",
+  "customer_status": "ACTIVE",
+  "device_type": "MOBILE_PHONE",
+  "device_os_family": "ANDROID",
+  "device_app_version": "4.1.0",
+  "device_is_emulator_flag": "False",
+  "device_is_rooted_flag": "False",
+  "device_specificity_flag": "HIGH_SPECIFICITY",
+  "merchant_mcc": "5411",
+  "merchant_mcc_description": "Grocery Stores, Supermarkets",
+  "merchant_volume_band": "100K-500K",
+  "merchant_ticket_band": "250K-1M",
+  "merchant_operating_hours": "09:00-18:00",
+  "merchant_mcc_flag": "VALID"
+};
+
+function severityFromScore(score){return score>=75?'high':score>=45?'medium':'low';}
+function statusClass(status){return status==='Selesai'?'done':status==='Sedang Diinvestigasi'?'investigating':'pending';}
+function renderAlerts(){
+  const query=$('#searchAlerts').value.trim().toLowerCase();
+  const risk=$('#riskFilter').value;
+  const status=$('#statusFilter').value;
+  const visible=alerts.filter(item=>
+    (!query||(item.id+' '+item.customer).toLowerCase().includes(query)) &&
+    (!risk||item.severity===risk) && (!status||item.status===status)
+  ).sort((a,b)=>b.score-a.score);
+  $('#count').textContent=`${visible.length} dari ${alerts.length} peringatan contoh`;
+  const list=$('#list');list.replaceChildren();
+  if(!visible.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Tidak ada peringatan yang cocok dengan filter.';list.append(empty);return;}
+  visible.forEach(item=>{
+    const button=document.createElement('button');button.type='button';button.className=`alert-item ${item.severity}`;button.setAttribute('aria-current',String(selectedAlertId===item.id));
+    const bar=document.createElement('span');bar.className='bar';
+    const content=document.createElement('span');content.className='alert-main';
+    const title=document.createElement('b');title.textContent=`${item.id} · Rp${formatter.format(item.amount)}`;
+    const customer=document.createElement('div');customer.className='customer';customer.textContent=item.customer;
+    const meta=document.createElement('div');meta.className='meta';
+    const badge=document.createElement('span');badge.className=`badge ${statusClass(item.status)}`;badge.textContent=item.status;
+    const time=document.createElement('span');time.textContent=item.time;
+    meta.append(badge,time);content.append(title,customer,meta);
+    const score=document.createElement('span');score.className='score';score.textContent=`${item.score}%`;const small=document.createElement('small');small.textContent='Risiko contoh';score.append(small);
+    button.append(bar,content,score);button.addEventListener('click',()=>{selectedAlertId=item.id;renderAlerts();renderAlertDetail();});list.append(button);
+  });
+}
+function renderAlertDetail(){
+  const box=$('#detail');box.replaceChildren();
+  const item=alerts.find(entry=>entry.id===selectedAlertId);
+  if(!item){const note=document.createElement('span');note.className='small-label';note.textContent='Pilih satu peringatan untuk melihat detailnya.';box.append(note);return;}
+  const top=document.createElement('div');top.className='detail-top';const heading=document.createElement('strong');heading.textContent=`Detail ${item.id}`;const tag=document.createElement('span');tag.className='tag';tag.textContent='Data contoh';top.append(heading,tag);box.append(top);
+  const dl=document.createElement('dl');
+  [['Nasabah',item.customer],['Nominal',`Rp${formatter.format(item.amount)}`],['Skor contoh',`${item.score}%`],['Waktu',item.time],['Alasan',item.reason]].forEach(([label,value])=>{const dt=document.createElement('dt');dt.textContent=label;const dd=document.createElement('dd');dd.textContent=value;dl.append(dt,dd);});box.append(dl);
+  const label=document.createElement('label');label.className='small-label';label.htmlFor='alertStatus';label.textContent='Status penanganan (sementara di browser)';const select=document.createElement('select');select.id='alertStatus';['Menunggu','Sedang Diinvestigasi','Selesai'].forEach(status=>{const opt=document.createElement('option');opt.value=status;opt.textContent=status;opt.selected=status===item.status;select.append(opt);});select.style.marginTop='7px';select.addEventListener('change',()=>{item.status=select.value;renderAlerts();renderAlertDetail();});box.append(label,select);
+}
+['#searchAlerts','#riskFilter','#statusFilter'].forEach(id=>$(id).addEventListener('input',renderAlerts));
+
+function setApiStatus(state,title,detail){
+  const pill=$('#apiPill');pill.className=`pill ${state}`;$('#apiPillText').textContent=title;$('#modelStatusTitle').textContent=title;$('#modelStatusText').textContent=detail;
+}
+async function refreshHealth(){
+  setApiStatus('wait','Memeriksa API...','Menghubungi backend Python.');
+  $('#modelTag').className='tag amber';$('#modelTag').textContent='Memeriksa';$('#predictButton').disabled=true;
+  try{
+    const response=await fetch('/api/health',{headers:{'Accept':'application/json'}});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok){throw new Error(data.message||data.error||data.details||`API merespons HTTP ${response.status}`);}
+    const meta=data.metadata||{};
+    setApiStatus('ready','Model siap',data.message||'Pipeline siap menerima prediksi.');
+    $('#modelTag').className='tag green';$('#modelTag').textContent='Siap';
+    $('#modelType').textContent=meta.model_type||'Random Forest';
+    $('#treeCount').textContent=meta.n_estimators??'—';$('#depthCount').textContent=meta.max_depth??'—';$('#featureCount').textContent=meta.feature_count??46;
+    $('#predictButton').disabled=false;
+  }catch(error){
+    setApiStatus('error','API / model belum siap',error.message||'Tidak dapat terhubung ke backend.');
+    $('#modelTag').className='tag amber';$('#modelTag').textContent='Belum tersedia';
+    $('#modelType').textContent='Backend Python';$('#treeCount').textContent='—';$('#depthCount').textContent='—';$('#featureCount').textContent='46';
+    $('#predictButton').disabled=true;
+  }
+}
+function showPredictionError(message){const el=$('#predictionError');el.hidden=false;el.textContent=message;$('#predictionResult').classList.remove('show');}
+async function runPrediction(){
+  $('#predictionError').hidden=true;$('#predictButton').disabled=true;$('#predictButton').textContent='Memproses...';
+  try{
+    let transaction;
+    try{transaction=JSON.parse($('#transactionJson').value);}catch{throw new Error('JSON tidak valid. Periksa tanda kutip, koma, dan kurung.');}
+    if(!transaction||Array.isArray(transaction)||typeof transaction!=='object'){throw new Error('Input harus berupa objek JSON dengan nama fitur sebagai key.');}
+    const thresholdPercent=Number($('#threshold').value);
+    if(!Number.isFinite(thresholdPercent)||thresholdPercent<0||thresholdPercent>100){throw new Error('Ambang batas harus berupa angka 0 sampai 100.');}
+    const response=await fetch('/api/predict',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({transaction,threshold:thresholdPercent/100})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok){throw new Error(data.error||data.message||data.details||`Prediksi gagal (HTTP ${response.status}).`);}
+    const result=$('#predictionResult');result.classList.add('show');
+    $('#predictionLabel').textContent=data.prediction;$('#predictionLabel').className=`result-label ${data.prediction==='SUSPICIOUS'?'suspicious':'normal'}`;
+    $('#riskNumber').textContent=`${Number(data.risk_percent).toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}%`;
+    $('#riskMeter').style.width=`${Math.max(0,Math.min(100,Number(data.risk_percent)))}%`;
+    $('#predictionMessage').textContent=data.warning||'Prediksi selesai.';
+    $('#providedCount').textContent=`${data.provided_feature_count} dari ${data.total_feature_count}`;
+    $('#missingCount').textContent=`${data.missing_feature_count} fitur`;
+    $('#thresholdUsed').textContent=`${(data.threshold*100).toLocaleString('id-ID')}%`;
+  }catch(error){showPredictionError(error.message||'Terjadi kesalahan tidak diketahui.');}
+  finally{$('#predictButton').disabled=false;$('#predictButton').textContent='Prediksi Risiko';}
+}
+$('#refreshHealth').addEventListener('click',refreshHealth);
+$('#predictButton').addEventListener('click',runPrediction);
+$('#loadExample').addEventListener('click',()=>{$('#transactionJson').value=JSON.stringify(exampleTransaction,null,2);$('#predictionError').hidden=true;});
+$('#transactionJson').value=JSON.stringify(exampleTransaction,null,2);
+renderAlerts();renderAlertDetail();refreshHealth();
+</script>
+</body>
+</html>
