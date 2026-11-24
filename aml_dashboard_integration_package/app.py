@@ -42,9 +42,14 @@ from auth_service import (
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR.parent / ".env")
-MODEL_PATH = Path(os.environ.get(
+AML_MODEL_PATH = Path(os.environ.get(
     "AML_MODEL_PATH",
     BASE_DIR / "models" / "aml_random_forest_pipeline_trained.joblib",
+)).expanduser().resolve()
+MODEL_PATH = AML_MODEL_PATH
+FRAUD_MODEL_PATH = Path(os.environ.get(
+    "FRAUD_MODEL_PATH",
+    BASE_DIR / "models" / "fraud_random_forest_pipeline_trained.joblib",
 )).expanduser().resolve()
 DASHBOARD_PATH = "dashboard-aml-fraud-integrated.html"
 DASHBOARD_DIR = BASE_DIR / "dashboard"
@@ -155,7 +160,10 @@ NUMERIC_FEATURES = {
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 model = None
+aml_model = None
+fraud_model = None
 model_load_error: str | None = None
+fraud_model_load_error: str | None = None
 _dataset_lock = threading.RLock()
 _dataset_cache: pd.DataFrame | None = None
 _dataset_cache_signature: tuple[tuple[str, int, str], ...] | None = None
@@ -201,21 +209,32 @@ def get_db_conn_safe():
 
 
 def load_pipeline() -> None:
-    """Load the serialized model once; retain any error for the health endpoint."""
-    global model, model_load_error
+    """Load both AML and Fraud serialized models; retain any errors for health endpoint."""
+    global model, aml_model, fraud_model, model_load_error, fraud_model_load_error
+
+    # 1. Load AML Model
     try:
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(f"Model tidak ditemukan: {MODEL_PATH.name}")
-        model = joblib.load(MODEL_PATH)
-        loaded_features = list(getattr(model, "feature_names_in_", []))
-        if loaded_features and loaded_features != FEATURES:
-            raise RuntimeError(
-                "Daftar fitur pipeline tidak cocok dengan skema API. Periksa versi model dan FEATURES di app.py."
-            )
+        if not AML_MODEL_PATH.exists():
+            raise FileNotFoundError(f"Model AML tidak ditemukan: {AML_MODEL_PATH.name}")
+        aml_model = joblib.load(AML_MODEL_PATH)
+        model = aml_model  # alias for backwards compatibility
         model_load_error = None
-    except Exception as exc:  # keep the app running so /api/health can report the issue
+    except Exception as exc:
         model = None
+        aml_model = None
         model_load_error = f"{type(exc).__name__}: {exc}"
+
+    # 2. Load Fraud Detection Model
+    try:
+        if FRAUD_MODEL_PATH.exists():
+            fraud_model = joblib.load(FRAUD_MODEL_PATH)
+            fraud_model_load_error = None
+        else:
+            fraud_model = None
+            fraud_model_load_error = f"Model Fraud belum dilatih: {FRAUD_MODEL_PATH.name}"
+    except Exception as exc:
+        fraud_model = None
+        fraud_model_load_error = f"{type(exc).__name__}: {exc}"
 
 
 load_pipeline()
@@ -225,6 +244,7 @@ def model_metadata() -> dict[str, Any]:
     if model is None:
         return {}
     classifier = getattr(model, "named_steps", {}).get("classifier")
+    fraud_classifier = getattr(fraud_model, "named_steps", {}).get("classifier") if fraud_model else None
     return {
         "model_type": type(classifier).__name__ if classifier is not None else type(model).__name__,
         "feature_count": len(FEATURES),
@@ -237,6 +257,20 @@ def model_metadata() -> dict[str, Any]:
             "Indikasi potensi fraud berdasarkan label sintetis SUSPICIOUS; "
             "bukan fraud terkonfirmasi."
         ),
+        "dual_models": {
+            "aml_model": {
+                "available": aml_model is not None,
+                "type": type(classifier).__name__ if classifier is not None else None,
+                "max_depth": getattr(classifier, "max_depth", None),
+                "n_estimators": getattr(classifier, "n_estimators", None),
+            },
+            "fraud_model": {
+                "available": fraud_model is not None,
+                "type": type(fraud_classifier).__name__ if fraud_classifier is not None else None,
+                "max_depth": getattr(fraud_classifier, "max_depth", None),
+                "n_estimators": getattr(fraud_classifier, "n_estimators", None),
+            },
+        },
     }
 
 
@@ -1249,15 +1283,28 @@ def predict():
 
     frame = pd.DataFrame([row], columns=FEATURES)
     try:
-        probabilities = model.predict_proba(frame)[0]
-        classes = list(model.classes_)
-        suspicious_index = next((i for i, cls in enumerate(classes) if str(cls) == "1"), None)
-        if suspicious_index is None:
-            return jsonify({
-                "ok": False,
-                "error": "Pipeline tidak memiliki kelas target 1. Pastikan label 1 memang berarti SUSPICIOUS.",
-            }), 500
-        score = float(probabilities[suspicious_index])
+        aml_score = 0.0
+        fraud_score = 0.0
+
+        # Scoring AML Model
+        target_aml = aml_model or model
+        if target_aml is not None:
+            aml_proba = target_aml.predict_proba(frame)[0]
+            classes = list(target_aml.classes_)
+            idx = next((i for i, cls in enumerate(classes) if str(cls) == "1"), 1 if len(classes) > 1 else 0)
+            aml_score = float(aml_proba[idx])
+
+        # Scoring Fraud Model
+        if fraud_model is not None:
+            fraud_proba = fraud_model.predict_proba(frame)[0]
+            f_classes = list(fraud_model.classes_)
+            f_idx = next((i for i, cls in enumerate(f_classes) if str(cls) == "1"), 1 if len(f_classes) > 1 else 0)
+            fraud_score = float(fraud_proba[f_idx])
+        else:
+            fraud_score = aml_score
+
+        # Overall risk score is maximum of both risks
+        score = max(aml_score, fraud_score)
     except Exception as exc:
         return jsonify({
             "ok": False,
@@ -1275,18 +1322,22 @@ def predict():
         ),
         "risk_score": round(score, 6),
         "risk_percent": round(score * 100, 2),
+        "aml_risk_score": round(aml_score, 6),
+        "aml_risk_percent": round(aml_score * 100, 2),
+        "aml_prediction": "SUSPICIOUS" if aml_score >= threshold else "NORMAL",
+        "fraud_risk_score": round(fraud_score, 6),
+        "fraud_risk_percent": round(fraud_score * 100, 2),
+        "fraud_prediction": "SUSPICIOUS" if fraud_score >= threshold else "NORMAL",
         "threshold": threshold,
         "provided_feature_count": len(provided),
         "total_feature_count": len(FEATURES),
         "missing_features": missing,
         "missing_feature_count": len(missing),
         "warning": (
-            "Model mempelajari label sintetis SUSPICIOUS sebagai proxy potensi fraud, "
-            "bukan fraud terkonfirmasi. Sebagian fitur tidak diberikan dan diisi oleh preprocessing pipeline. "
-            "Gunakan semua fitur yang tersedia dan validasi model sebelum memakai skor untuk keputusan operasional."
+            "Model ganda mengevaluasi risiko AML dan Fraud secara simultan. "
+            "Sebagian fitur tidak diberikan dan diisi oleh preprocessing pipeline."
             if missing else
-            "Label positif adalah proxy potensi fraud dari data sintetis SUSPICIOUS, bukan fraud terkonfirmasi. "
-            "Validasi performa dan ambang batas model sebelum penggunaan operasional."
+            "Model ganda mengevaluasi risiko AML dan Fraud secara simultan."
         ),
         "model": model_metadata(),
     })

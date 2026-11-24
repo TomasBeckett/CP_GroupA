@@ -47,13 +47,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-output", type=Path, default=DEFAULT_MODEL_PATH)
     parser.add_argument("--report-output", type=Path, default=DEFAULT_REPORT_PATH)
     parser.add_argument("--trees", type=int, default=100)
-    parser.add_argument("--max-depth", type=int, default=20)
+    parser.add_argument("--max-depth", type=int, default=12)
+    parser.add_argument("--min-samples-leaf", type=int, default=10)
+    parser.add_argument("--min-samples-split", type=int, default=20)
     parser.add_argument("--test-fraction", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
     return parser.parse_args()
 
 
-def build_pipeline(trees: int, max_depth: int, random_state: int) -> Pipeline:
+def build_pipeline(
+    trees: int,
+    max_depth: int,
+    random_state: int,
+    min_samples_leaf: int = 10,
+    min_samples_split: int = 20,
+) -> Pipeline:
     numeric_features = [name for name in FEATURES if name in NUMERIC_FEATURES]
     categorical_features = [name for name in FEATURES if name not in NUMERIC_FEATURES]
     numeric_pipeline = Pipeline([
@@ -76,8 +84,9 @@ def build_pipeline(trees: int, max_depth: int, random_state: int) -> Pipeline:
             n_estimators=trees,
             max_depth=max_depth,
             class_weight="balanced_subsample",
-            min_samples_leaf=2,
-            n_jobs=min(4, os.cpu_count() or 1),
+            min_samples_leaf=min_samples_leaf,
+            min_samples_split=min_samples_split,
+            n_jobs=min(8, os.cpu_count() or 1),
             random_state=random_state,
         )),
     ])
@@ -176,7 +185,13 @@ def main() -> None:
             "Periksa sebaran label terhadap waktu sebelum melatih."
         )
 
-    pipeline = build_pipeline(args.trees, args.max_depth, args.random_state)
+    pipeline = build_pipeline(
+        args.trees,
+        args.max_depth,
+        args.random_state,
+        min_samples_leaf=args.min_samples_leaf,
+        min_samples_split=args.min_samples_split,
+    )
     fit_started = time.perf_counter()
     pipeline.fit(train[FEATURES], train["_target"])
     fit_seconds = time.perf_counter() - fit_started

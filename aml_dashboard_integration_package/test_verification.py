@@ -1,7 +1,9 @@
 import sys
 import json
 
-sys.path.insert(0, r"G:\Capstone\TestCapstone\aml_dashboard_integration_package")
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(BASE_DIR))
 import app
 
 client = app.app.test_client()
@@ -113,7 +115,7 @@ assert audit_res.status_code == 200
 assert len(audit_data.get("logs", [])) > 0
 
 print("\n=== 9. Frontend HTML Integrity ===")
-with open(r"G:\Capstone\TestCapstone\aml_dashboard_integration_package\dashboard\dashboard-aml-fraud-integrated.html", "r", encoding="utf-8") as f:
+with open(BASE_DIR / "dashboard" / "dashboard-aml-fraud-integrated.html", "r", encoding="utf-8") as f:
     html = f.read()
 
 required_elements = [
