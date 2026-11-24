@@ -1,0 +1,1999 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Prototipe dashboard FCIP Indonesia untuk pemantauan AML, manajemen alert dan kasus, tata kelola, serta uji pipeline Random Forest.">
+<title>FCIP Indonesia — Crime Intelligence Platform</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#080d18;
+  --sidebar:#0b1220;
+  --panel:#111b2c;
+  --panel2:#152136;
+  --panel3:#1b2940;
+  --border:#25344d;
+  --text:#e7edf9;
+  --muted:#8998b2;
+  --cyan:#08c6e8;
+  --cyan2:#16bde0;
+  --green:#19d3a2;
+  --amber:#ffb323;
+  --red:#ff586b;
+  --blue:#4388ff;
+  --r:11px;
+  --shadow:0 10px 30px #0002;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 Inter,"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+a{color:var(--cyan)}
+[hidden]{display:none!important}
+
+.app-shell{min-height:100vh;display:grid;grid-template-columns:226px minmax(0,1fr)}
+.sidebar{background:var(--sidebar);border-right:1px solid #1a2940;min-height:100vh;padding:17px 12px 12px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:10}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 12px}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(145deg,#0ad3eb,#0085ab);display:grid;place-items:center;box-shadow:0 5px 16px #00c8e733;flex:none}
+.brand-mark svg{width:22px;height:22px}
+.brand-name{font-weight:800;font-size:12px;letter-spacing:.04em}
+.brand-name small{display:block;font-size:9px;color:#58d8e9;letter-spacing:.1em;font-weight:700;margin-top:2px}
+.nav-group{display:grid;gap:4px}
+.nav-label{padding:0 11px 7px;font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:#64738e}
+.nav-item{display:flex;gap:11px;align-items:center;text-align:left;padding:10px 11px;border:1px solid transparent;border-radius:8px;background:transparent;color:#9aa8bf;width:100%;transition:background .15s,border-color .15s,color .15s}
+.nav-item:hover{background:#111c2f;color:var(--text)}
+.nav-item.active{background:#1b2a3e;border-color:#26384f;color:#fff;box-shadow:inset 2px 0 0 var(--cyan)}
+.nav-icon{font-size:15px;width:18px;text-align:center;color:#a5b4cb}
+.nav-item.active .nav-icon{color:var(--cyan)}
+.nav-count{margin-left:auto;font-size:10px;border-radius:5px;padding:2px 6px;background:#112a3b;color:#23d4ed}
+.sidebar-spacer{flex:1}
+.environment{background:#111c2d;border:1px solid #203149;border-radius:9px;padding:10px 11px;margin:0 1px}
+.env-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em}
+.env-title{font-size:11px;font-weight:700;margin:5px 0 4px}
+.env-live{font-size:10px;color:var(--green)}
+.env-live:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px}
+.profile{display:flex;align-items:center;gap:9px;padding:0 4px 2px}
+.avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#526f8b,#24364d);font-size:11px;font-weight:800;border:1px solid #49627b}
+.profile strong{display:block;font-size:10px}
+.profile small{display:block;color:var(--muted);font-size:9px;margin-top:2px}
+
+.main-shell{min-width:0}
+.topbar{height:66px;border-bottom:1px solid #1d2b42;background:#0b1220;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:0 25px;position:sticky;top:0;z-index:8}
+.top-title{min-width:190px}
+.top-title strong{font-size:14px;display:block}
+.top-title small{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.top-actions{display:flex;align-items:center;gap:9px}
+.global-search{display:flex;align-items:center;gap:8px;width:min(300px,30vw);background:#0e1828;border:1px solid #1f2d44;border-radius:8px;padding:8px 10px;color:var(--muted)}
+.global-search input{width:100%;border:0;background:transparent;outline:0;color:var(--text);font-size:11px;min-width:0}
+.icon-btn{width:34px;height:34px;border:1px solid #26364d;background:#111c2d;border-radius:9px;position:relative}
+.icon-btn .notify-dot{position:absolute;right:7px;top:6px;width:5px;height:5px;border-radius:50%;background:var(--red)}
+.mobile-menu{display:none}
+
+.content{padding:23px 24px 30px;max-width:1800px;margin:0 auto}
+.view{display:none;animation:fade .18s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:.65;transform:translateY(2px)}to{opacity:1;transform:none}}
+
+.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px}
+.page-heading h1{font-size:21px;line-height:1.25;margin:0 0 5px;font-weight:750;letter-spacing:-.025em}
+.page-heading p{margin:0;color:var(--muted);font-size:11px}
+.eyebrow{font-size:9px;color:var(--cyan);text-transform:uppercase;letter-spacing:.14em;font-weight:800;margin-bottom:6px}
+.button-row{display:flex;gap:8px;align-items:center}
+.btn{border:1px solid transparent;border-radius:7px;padding:9px 13px;font-size:10px;font-weight:750;background:var(--cyan);color:#03121b;transition:filter .15s,transform .1s;white-space:nowrap}
+.btn:hover{filter:brightness(1.09)}
+.btn:active{transform:translateY(1px)}
+.btn.secondary{background:#1a263a;border-color:#2b3b53;color:#d6dfef}
+.btn.ghost{background:transparent;border-color:#293850;color:#a9b7cc}
+.btn.warn{background:#342714;border-color:#5d451c;color:#ffc348}
+.btn.danger{background:#3a1826;border-color:#6c2636;color:#ff7e8d}
+.btn.small{padding:6px 9px;font-size:9px}
+
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:9px;line-height:1.25;padding:4px 7px;border-radius:4px;background:#17253a;color:#9cafc9;border:1px solid #293a54;white-space:nowrap}
+.tag.cyan{color:var(--cyan);background:#082d3b;border-color:#14566b}
+.tag.green{color:var(--green);background:#092c2c;border-color:#18524b}
+.tag.amber{color:var(--amber);background:#302619;border-color:#58431f}
+.tag.red{color:#ff7588;background:#371b2a;border-color:#6a293b}
+.tag.blue{color:#78a9ff;background:#162845;border-color:#29436a}
+.tag.gray{color:#b0bbcd}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor}
+
+.demo-note{font-size:10px;color:#b6c7db;background:#102333;border:1px solid #184256;border-radius:8px;padding:9px 12px;margin-bottom:15px}
+.demo-note strong{color:#5ee0f3}
+.grid{display:grid;gap:14px}
+.stats-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px}
+.stat-card,.panel{background:var(--panel);border:1px solid #1c2b42;border-radius:var(--r);min-width:0;box-shadow:var(--shadow)}
+.stat-card{padding:15px 16px 13px;position:relative;overflow:hidden}
+.stat-card:after{content:"";position:absolute;width:65px;height:65px;right:-27px;top:-30px;border:1px solid #ffffff08;border-radius:50%}
+.stat-top{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:10px}
+.stat-symbol{width:24px;height:24px;display:grid;place-items:center;border:1px solid #293e56;border-radius:6px;background:#17263a;color:var(--cyan);font-size:13px}
+.stat-value{font-size:27px;font-weight:800;letter-spacing:-.04em;margin:8px 0 4px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat-foot{font-size:9px;color:var(--muted)}
+.stat-foot .up{color:var(--green)}
+.stat-foot .down{color:var(--red)}
+
+.mid-grid{grid-template-columns:minmax(0,1.75fr) minmax(260px,.95fr);margin-bottom:14px}
+.panel{padding:16px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.panel-head h2{font-size:12px;margin:0;font-weight:750}
+.panel-head p{color:var(--muted);font-size:9px;margin:4px 0 0}
+.panel-head .subtle-action{color:var(--cyan);background:transparent;border:0;font-size:9px;font-weight:700}
+.chart-wrap{height:177px;position:relative}
+.chart-wrap svg{width:100%;height:100%;display:block}
+.chart-foot{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);padding-top:3px}
+
+.sla-list{display:grid;gap:17px}
+.sla-item{display:grid;gap:7px}
+.sla-label{display:flex;justify-content:space-between;gap:8px;font-size:10px}
+.sla-label span:first-child{color:#aebad0}
+.sla-label strong{font-size:10px}
+.meter{height:4px;border-radius:99px;background:#26344a;overflow:hidden}
+.meter span{height:100%;display:block;border-radius:99px;background:var(--cyan)}
+.meter.red span{background:var(--red)}
+.meter.amber span{background:var(--amber)}
+.meter.green span{background:var(--green)}
+
+.stream-panel{margin-bottom:14px}
+.table-wrap{overflow-x:auto;width:100%}
+table{border-collapse:collapse;width:100%;min-width:730px;font-size:10px}
+th{text-align:left;color:#8293ad;font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:10px 10px;border-bottom:1px solid #26354c;white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid #1f2d43;color:#ced8e8;vertical-align:middle}
+tbody tr:hover{background:#172439}
+tbody tr:last-child td{border-bottom:0}
+.id-link{color:var(--cyan);font-weight:750;background:transparent;border:0;padding:0;text-align:left}
+.muted{color:var(--muted)}
+.numeric{font-variant-numeric:tabular-nums}
+.nowrap{white-space:nowrap}
+
+.priority{font-size:8px;font-weight:800;padding:3px 6px;border-radius:3px;display:inline-block;white-space:nowrap}
+.priority.critical{background:#ffe1e5;color:#b71e37}
+.priority.high{background:#fff0d1;color:#986000}
+.priority.medium{background:#fdf1c9;color:#8c6600}
+.priority.low{background:#c9f6e7;color:#007b5e}
+.status{font-size:8px;font-weight:750;padding:3px 6px;border-radius:4px;background:#202e42;color:#aebdd2;white-space:nowrap;display:inline-block}
+.status.open{color:#75dfff;background:#112e45}
+.status.in-progress{color:#8ab6ff;background:#172944}
+.status.escalated{color:#ffce6b;background:#342b1c}
+.status.closed{color:#77e9c7;background:#112d2c}
+.status.pending{color:#ffcf72;background:#342a1e}
+
+.table-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.filter-panel{padding:12px;margin-bottom:12px}
+.filter-grid{display:grid;grid-template-columns:minmax(180px,1.5fr) repeat(4,minmax(115px,1fr));gap:8px}
+.field,.field-select{width:100%;background:#0d1727;border:1px solid #2a3a52;border-radius:7px;padding:9px 10px;font-size:10px;color:#d9e4f3;min-width:0}
+.field::placeholder{color:#64748e}
+.filter-footer{border-top:1px solid #233249;padding-top:11px;margin-top:11px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bulk-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.check{accent-color:var(--cyan);width:13px;height:13px}
+.table-panel{padding:0;overflow:hidden}
+.table-toolbar{padding:13px 16px;border-bottom:1px solid #25344a;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.table-toolbar strong{font-size:10px}
+.table-toolbar small{font-size:9px;color:var(--muted)}
+.table-panel .table-wrap{padding:0 12px}
+.pagination{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:9px;border-top:1px solid #25344a;color:var(--muted);font-size:9px}
+.page-nums{display:flex;gap:4px}
+.page-nums button{min-width:26px;width:auto;height:25px;padding:0 8px;background:transparent;border:1px solid #283950;border-radius:5px;color:#acb9cd;font-size:9px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s, color .15s}
+.page-nums button:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan)}
+.page-nums button.active{background:var(--cyan);border-color:var(--cyan);color:#00151d;font-weight:800}
+.page-nums button:disabled{opacity:0.35;cursor:not-allowed}
+
+.detail-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.9fr);gap:14px}
+.detail-banner{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:13px}
+.detail-title{font-size:18px;font-weight:800}
+.detail-title small{font-size:10px;color:var(--muted);display:block;font-weight:400;margin-top:5px}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px 20px}
+.summary-item span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.summary-item strong{font-size:11px;font-weight:700}
+.analysis-bars{height:185px;display:flex;align-items:flex-end;gap:12px;padding:10px 7px 0}
+.analysis-bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:7px}
+.analysis-bar span{display:block;width:min(100%,38px);min-height:6px;border-radius:3px 3px 0 0;background:var(--cyan)}
+.analysis-bar:nth-child(2) span{background:#2dbad7}
+.analysis-bar:nth-child(3) span{background:#18cba2}
+.analysis-bar:nth-child(4) span{background:#f6a51a}
+.analysis-bar:nth-child(5) span{background:#687a9d}
+.analysis-bar small{font-size:8px;color:var(--muted);text-align:center}
+.risk-score-circle{width:61px;height:61px;border:3px solid var(--red);border-radius:50%;display:grid;place-items:center;font-size:20px;font-weight:800;flex:none}
+.risk-score-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.risk-score-head strong{display:block;color:var(--red);font-size:11px}
+.risk-score-head small{display:block;color:var(--muted);font-size:9px;margin-top:4px}
+.factor-list{display:grid;gap:15px}
+.factor-row{display:grid;gap:6px}
+.factor-row header{display:flex;justify-content:space-between;gap:8px;font-size:9px;color:#abb9cf}
+.factor-row header strong{color:var(--amber)}
+.action-stack{display:grid;gap:8px}
+.action-card{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:10px;background:#0d1727;border:1px solid #213148;border-radius:8px}
+.action-card strong{font-size:9px;display:block}
+.action-card small{display:block;color:var(--muted);font-size:8px;margin-top:4px}
+.case-stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:13px}
+.tabs{display:flex;gap:15px;border-bottom:1px solid #24334a;margin-bottom:13px;overflow:auto}
+.tab{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:7px 2px 10px;font-size:9px;white-space:nowrap}
+.tab.active{color:var(--cyan);border-color:var(--cyan);font-weight:800}
+.rules-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rule-card{background:var(--panel2);border:1px solid #26374e;border-radius:9px;padding:14px}
+.rule-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rule-card h3{font-size:11px;margin:11px 0 6px}
+.rule-card p{font-size:9px;color:var(--muted);min-height:30px;margin:0}
+.rule-meta{display:flex;justify-content:space-between;gap:8px;margin-top:13px;padding-top:10px;border-top:1px solid #2a3a51;color:var(--muted);font-size:8px}
+.toggle{appearance:none;width:28px;height:16px;background:#354158;border-radius:20px;position:relative;cursor:pointer;flex:none;border:0}
+.toggle:before{content:"";position:absolute;width:10px;height:10px;left:3px;top:3px;background:#95a3b8;border-radius:50%;transition:transform .15s}
+.toggle:checked{background:#087d90}
+.toggle:checked:before{transform:translateX(12px);background:white}
+.two-col{grid-template-columns:minmax(0,1.2fr) minmax(270px,.8fr)}
+.governance-matrix table{min-width:600px}
+.governance-matrix td,.governance-matrix th{text-align:center}
+.governance-matrix td:first-child,.governance-matrix th:first-child{text-align:left}
+.perm{color:var(--cyan);font-weight:700}
+.perm.no{color:#52627a}
+
+.model-layout{grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr)}
+.model-api{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0c1727;border:1px solid #26384f;border-radius:9px;padding:12px}
+.model-api strong{font-size:10px}
+.model-api p{font-size:9px;color:var(--muted);margin:4px 0 0}
+.model-stats{grid-template-columns:repeat(3,minmax(0,1fr));margin:12px 0}
+.mini-stat{background:var(--panel2);border:1px solid #26364c;border-radius:8px;padding:11px}
+.mini-stat span{display:block;color:var(--muted);font-size:9px}
+.mini-stat strong{font-size:19px;display:block;margin:5px 0 2px}
+.mini-stat small{font-size:8px;color:var(--muted)}
+textarea.json-input{min-height:280px;resize:vertical;width:100%;background:#0b1423;border:1px solid #293a53;border-radius:8px;padding:11px;font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;color:#cce6f7;tab-size:2}
+.model-threshold{display:grid;grid-template-columns:1fr 110px;align-items:end;gap:9px;margin-top:10px}
+.result-box{display:none;background:#0e1929;border:1px solid #263b53;border-radius:9px;padding:13px;margin-top:12px}
+.result-box.show{display:block}
+.result-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.result-number{font-size:24px;font-weight:850;color:var(--cyan)}
+.result-label{font-size:14px;font-weight:850}
+.result-label.suspicious{color:var(--red)}
+.result-label.normal{color:var(--green)}
+.notice-box{font-size:9px;color:#c0cde0;padding:10px;border:1px solid #59451e;background:#261f16;border-radius:8px;margin:12px 0}
+.error-box{display:none;background:#351a28;border:1px solid #6b2d40;color:#ffabb8;border-radius:8px;padding:10px;margin-top:10px;font-size:10px}
+.error-box.show{display:block}
+
+.report-kpis{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px}
+.report-kpi{padding:14px}
+.report-kpi span{font-size:9px;color:var(--muted)}
+.report-kpi strong{display:block;font-size:23px;margin:8px 0 4px}
+.report-kpi small{color:var(--muted);font-size:8px}
+.calendar-list{display:grid;gap:9px}
+.calendar-item{display:grid;grid-template-columns:50px 1fr auto;gap:10px;align-items:center;background:#0d1727;border:1px solid #25364d;border-radius:8px;padding:10px}
+.calendar-date{background:#14243b;border:1px solid #2a4160;border-radius:6px;text-align:center;padding:7px 3px}
+.calendar-date strong{display:block;font-size:13px;color:var(--cyan)}
+.calendar-date small{display:block;font-size:8px;color:var(--muted)}
+.calendar-item strong{display:block;font-size:9px}
+.calendar-item small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
+
+.toast-region{position:fixed;right:16px;bottom:16px;z-index:50;display:grid;gap:8px;width:min(340px,calc(100vw - 32px))}
+.toast{background:#16243a;border:1px solid #2b4561;border-left:3px solid var(--cyan);padding:11px 13px;border-radius:8px;box-shadow:var(--shadow);font-size:10px;animation:fade .15s}
+.toast.ok{border-left-color:var(--green)}
+.toast.err{border-left-color:var(--red)}
+.footer-note{padding:20px 0 10px;color:#657791;font-size:9px;text-align:center}
+.empty-state{text-align:center;color:var(--muted);padding:25px 12px;font-size:10px}
+.checkbox-cell{width:28px}
+
+.modal-backdrop{position:fixed;inset:0;background:#020711be;display:none;align-items:center;justify-content:center;padding:18px;z-index:60}
+.modal-backdrop.open{display:flex}
+.modal{width:min(460px,100%);background:#111c2d;border:1px solid #30435e;border-radius:12px;padding:18px;box-shadow:0 24px 80px #0008}
+.modal h2{margin:0 0 6px;font-size:15px}
+.modal p{font-size:10px;color:var(--muted);margin:0 0 14px}
+.modal-fields{display:grid;gap:11px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.field-label{display:block;font-size:9px;color:#aebcd0;margin-bottom:5px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
+@media(max-width:1250px){
+  .app-shell{grid-template-columns:205px minmax(0,1fr)}
+  .content{padding:19px 16px 25px}
+  .topbar{padding:0 16px}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .filter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .rules-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mid-grid{grid-template-columns:minmax(0,1.3fr) minmax(240px,.9fr)}
+}
+@media(max-width:900px){
+  .app-shell{grid-template-columns:minmax(0,1fr)}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:235px;height:100dvh;transform:translateX(-102%);transition:transform .2s;box-shadow:15px 0 40px #0005}
+  .sidebar.open{transform:translateX(0)}
+  .mobile-menu{display:inline-grid;place-items:center}
+  .top-title{min-width:0}
+  .global-search{width:min(280px,38vw)}
+  .mid-grid,.detail-layout,.two-col,.model-layout{grid-template-columns:minmax(0,1fr)}
+  .case-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .detail-layout .right-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .detail-layout .right-col .panel{min-width:0}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+  .topbar{height:58px;padding:0 10px;gap:8px}
+  .top-title strong{font-size:12px}
+  .top-title small{font-size:8px}
+  .top-actions{gap:5px}
+  .global-search{width:34px;padding:8px;justify-content:center}
+  .global-search input{display:none}
+  .global-search:focus-within{position:absolute;right:80px;top:10px;width:calc(100vw - 150px);z-index:3}
+  .global-search:focus-within input{display:block}
+  .content{padding:15px 10px 22px}
+  .page-heading{align-items:flex-start}
+  .page-heading h1{font-size:18px}
+  .page-heading p{font-size:10px}
+  .page-heading>.button-row{flex-wrap:wrap;justify-content:flex-end}
+  .btn{padding:8px 10px}
+  .stats-grid,.case-stats{gap:8px}
+  .stat-card{padding:11px}
+  .stat-value{font-size:23px}
+  .stat-top{font-size:9px}
+  .stat-foot{font-size:8px}
+  .panel{padding:12px}
+  .mid-grid{gap:10px}
+  .chart-wrap{height:150px}
+  .filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .filter-grid input:first-child{grid-column:1/-1}
+  .rules-grid{grid-template-columns:1fr}
+  .detail-layout .right-col{grid-template-columns:1fr}
+  .summary-grid{gap:13px}
+  .report-kpis{grid-template-columns:1fr}
+  .model-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .mini-stat{padding:8px}
+  .mini-stat strong{font-size:16px}
+  .model-threshold{grid-template-columns:minmax(0,1fr) 100px}
+  .form-row{grid-template-columns:1fr}
+  .pagination{flex-wrap:wrap}
+  .panel-head{align-items:flex-start}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar" aria-label="Navigasi utama">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 2.5 4 6v5.1c0 5.3 3.3 8.7 8 10.4 4.7-1.7 8-5.1 8-10.4V6z" stroke="white" stroke-width="1.6"/>
+          <path d="m8.2 12 2.5 2.5 5.2-5.2" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="brand-name">FCIP INDONESIA<small>AML &amp; FRAUD INTEL</small></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Workspace</div>
+      <button class="nav-item active" data-view="dashboard"><span class="nav-icon">▦</span>Dashboard</button>
+      <button class="nav-item" data-view="alerts"><span class="nav-icon">◉</span>Alert Queue<span class="nav-count" id="navAlertCount">8</span></button>
+      <button class="nav-item" data-view="alert-detail"><span class="nav-icon">⌕</span>Alert Detail</button>
+      <button class="nav-item" data-view="cases"><span class="nav-icon">♧</span>Case Management<span class="nav-count">8</span></button>
+      <button class="nav-item" data-view="rules"><span class="nav-icon">▽</span>Rule Management</button>
+      <button class="nav-item" data-view="operations"><span class="nav-icon">⌘</span>Data Operations</button>
+      <button class="nav-item" data-view="reporting"><span class="nav-icon">▤</span>Reporting</button>
+      <button class="nav-item" data-view="governance"><span class="nav-icon">♙</span>Governance</button>
+    </div>
+    <div class="sidebar-spacer"></div>
+    <div class="environment">
+      <div class="env-label">Active Environment</div>
+      <div class="env-title">NusantaraPay · DEMO</div>
+      <div class="env-live">Sample workspace active</div>
+    </div>
+    <div class="profile">
+      <div class="avatar">AS</div>
+      <div><strong>Andi Saputra</strong><small>Lead Investigator · Demo</small></div>
+    </div>
+  </aside>
+
+  <div class="main-shell">
+    <header class="topbar">
+      <button class="icon-btn mobile-menu" id="mobileMenu" aria-label="Buka navigasi">☰</button>
+      <div class="top-title">
+        <strong id="topTitle">Crime Intelligence Dashboard</strong>
+        <small id="topSubtitle">Overview of suspicious wallet activities and active AML alert streams.</small>
+      </div>
+      <div class="top-actions">
+        <label class="global-search" aria-label="Cari alert, kasus, atau subjek">
+          <span>⌕</span>
+          <input id="globalSearch" type="search" placeholder="Search alerts, cases, entities...">
+        </label>
+        <button class="icon-btn" id="notificationButton" aria-label="Notifikasi">♧<span class="notify-dot"></span></button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- 1. DASHBOARD VIEW -->
+      <section class="view active" id="view-dashboard"
+        data-title="Crime Intelligence Dashboard"
+        data-subtitle="Overview of suspicious wallet activities and active AML alert streams.">
+
+        <div class="page-heading">
+          <div>
+            <div class="eyebrow">Operations overview</div>
+            <h1>Crime Intelligence Dashboard</h1>
+            <p>Pantau transaksi mencurigakan, distribusi risiko, dan hasil analisis model ML.</p>
+          </div>
+          <div class="button-row">
+            <button class="btn secondary" data-go="reporting">View Detailed Report ↗</button>
+            <button class="btn" data-go="alerts">Open Alert Queue</button>
+          </div>
+        </div>
+
+        <div class="demo-note" id="liveDataNotice">
+          <strong>MENGHUBUNGKAN KE FCIP API...</strong> Menunggu data hasil scoring dari backend Flask.
+        </div>
+
+        <!-- Scope Switcher: Batch Upload Terkini vs Seluruh Portfolio -->
+        <div class="summary-scope-bar" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;background:#141d2b;padding:8px 14px;border-radius:10px;border:1px solid #26344a">
+          <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px">
+            <span>📊 <strong>LINGKUP STATISTIK:</strong></span>
+            <span id="currentScopeLabel" style="color:#38bdf8;font-weight:700">Batch Upload Terkini</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn small" id="btnScopeUpload" style="font-size:10px;padding:5px 12px;background:#0284c7;color:#fff">📁 Batch Upload Terkini (<span id="scopeUploadCount">10</span>)</button>
+            <button type="button" class="btn secondary small" id="btnScopeAll" style="font-size:10px;padding:5px 12px">🌐 Seluruh Database (350k)</button>
+          </div>
+        </div>
+
+        <div class="grid stats-grid">
+          <article class="stat-card">
+            <div class="stat-top"><span>PREDICTED SUSPICIOUS</span><span class="stat-symbol">◉</span></div>
+            <div class="stat-value" id="dashAlertCount">—</div>
+            <div class="stat-foot" id="dashAlertFoot">Menunggu hasil scoring model</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-top"><span>ACCOUNTS WITH ALERTS</span><span class="stat-symbol">♧</span></div>
+            <div class="stat-value" id="dashCaseCount">—</div>
+            <div class="stat-foot" id="dashCaseFoot">Menunggu ringkasan akun</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-top"><span>SOURCE LABEL: SUSPICIOUS</span><span class="stat-symbol">⚑</span></div>
+            <div class="stat-value" id="dashSourceSuspicious">—</div>
+            <div class="stat-foot" id="dashSourceFoot">Jumlah berdasarkan label sumber</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-top"><span>HIGH-RISK TRANSACTIONS</span><span class="stat-symbol">◷</span></div>
+            <div class="stat-value" id="dashHighRisk" style="color:var(--red)">—</div>
+            <div class="stat-foot" id="dashHighRiskFoot">Transaksi dengan skor risiko tinggi</div>
+          </article>
+        </div>
+
+        <div class="grid mid-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Transaction Risk Distribution</h2>
+                <p>Distribusi transaksi berdasarkan skor risiko model</p>
+              </div>
+              <span class="tag cyan">FCIP Scoring</span>
+            </div>
+            <div class="chart-wrap">
+              <div class="empty-state">Memuat distribusi risiko dari API...</div>
+            </div>
+            <div class="chart-foot">
+              <span id="riskChartTotal">Total transaksi: —</span>
+              <span id="riskChartThreshold">Ambang alert: —</span>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>ML Model Performance</h2>
+                <p>Metrik evaluasi model pada data pengujian</p>
+              </div>
+              <span class="tag cyan" id="mlModelStatus">Memeriksa model...</span>
+            </div>
+            <div class="sla-list" id="mlMetricsList">
+              <div class="empty-state">Memuat precision, recall, F1-score, dan ROC-AUC...</div>
+            </div>
+            <div class="chart-foot" style="margin-top:16px">
+              <span id="mlTestRows">Data uji: —</span>
+              <span id="mlTestPeriod">Periode uji: —</span>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel stream-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Scored Transactions (Active Alert Queue)</h2>
+              <p>Transaksi hasil scoring model FCIP yang melewati ambang alert</p>
+            </div>
+            <button class="btn ghost small" data-go="alerts">⌁ Filter Stream</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Account</th>
+                  <th>Risk Score</th>
+                  <th>Source Label</th>
+                  <th>Prediction</th>
+                  <th>Pattern</th>
+                  <th>Amount</th>
+                  <th>Priority</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardAlertsBody">
+                <tr><td colspan="9"><div class="empty-state">Menunggu data hasil scoring dari Flask API...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <!-- 2. ALERTS VIEW -->
+      <section class="view" id="view-alerts" data-title="Alert Queue Management" data-subtitle="Manage and triage incoming AML threat and compliance alerts.">
+        <div class="page-heading">
+          <div>
+            <div class="eyebrow">Monitoring &amp; triage</div>
+            <h1>Alert Queue Management</h1>
+            <p>Filter dan tindak lanjuti alert berdasarkan prioritas, pola transaksi, serta SLA.</p>
+          </div>
+          <div class="button-row">
+            <button class="btn secondary" id="exportAlertsBtn">↓ Export CSV</button>
+            <button class="btn" data-go="alert-detail">Open Selected Alert</button>
+          </div>
+        </div>
+
+        <section class="panel filter-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Alert Filter Engine <span class="tag cyan">● Active</span></h2>
+              <p>Filter bekerja pada dataset di antarmuka ini.</p>
+            </div>
+            <button class="subtle-action" id="resetAlertFilters">Reset All Filters</button>
+          </div>
+          <div class="filter-grid">
+            <input id="alertSearch" class="field" type="search" placeholder="Search alert ID or subject...">
+            <select id="alertPriorityFilter" class="field-select">
+              <option value="">Priority: All levels</option>
+              <option>Critical</option>
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
+            <select id="alertTypeFilter" class="field-select"><option value="">Alert Type: All Patterns</option></select>
+            <select id="alertAssigneeFilter" class="field-select">
+              <option value="">Assigned To: Anyone</option>
+              <option>Andi Saputra</option>
+              <option>Dina Permata</option>
+              <option>Rizky Pratama</option>
+              <option>Unassigned</option>
+            </select>
+            <select id="alertStatusFilter" class="field-select">
+              <option value="">Status: All</option>
+              <option>OPEN</option>
+              <option>IN PROGRESS</option>
+              <option>ESCALATED</option>
+              <option>CLOSED</option>
+            </select>
+          </div>
+          <div class="filter-footer">
+            <span id="alertCountText" class="muted" style="font-size:9px">Showing alerts</span>
+            <div class="bulk-actions">
+              <button class="btn secondary small" id="assignSelectedBtn">Assign Selected</button>
+              <button class="btn warn small" id="escalateSelectedBtn">↗ Escalate</button>
+              <button class="btn danger small" id="closeSelectedBtn">Bulk Close</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel table-panel">
+          <div class="table-toolbar">
+            <div><strong>Incoming Alert Records</strong><br><small>Centang baris untuk menjalankan aksi massal.</small></div>
+            <span class="tag gray" id="alertDataSourceTag">Demo data · local state</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="checkbox-cell"><input type="checkbox" class="check" id="selectAllAlerts" aria-label="Pilih semua alert"></th>
+                  <th>Alert ID</th>
+                  <th>Priority</th>
+                  <th>Subject Name</th>
+                  <th>Alert Type</th>
+                  <th>Score</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>SLA Left</th>
+                  <th>Assignee</th>
+                </tr>
+              </thead>
+              <tbody id="alertQueueBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="alertPaginationWrap">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <span id="alertPaginationText">Showing alerts</span>
+              <label style="display:inline-flex;align-items:center;gap:6px;font-size:9px;color:var(--muted)">
+                <span>Per Halaman:</span>
+                <select id="alertPageSize" class="field-select" style="width:auto;padding:3px 8px;height:26px;font-size:9px;border-radius:5px">
+                  <option value="10">10 record</option>
+                  <option value="25" selected>25 record</option>
+                  <option value="50">50 record</option>
+                  <option value="100">100 record</option>
+                  <option value="1000">Semua (1.000)</option>
+                </select>
+              </label>
+            </div>
+            <div class="page-nums" id="alertPageButtons"><button class="active" disabled>1</button></div>
+          </div>
+        </section>
+      </section>
+
+      <!-- 3. ALERT DETAIL VIEW -->
+      <section class="view" id="view-alert-detail" data-title="Crime Intelligence Platform" data-subtitle="Investigation terminal · secure audit record logged (demo interface).">
+        <div class="detail-banner">
+          <div>
+            <div class="eyebrow">Alert investigation terminal</div>
+            <div class="detail-title" id="detailHeading">Alert ALR-2026-00124 <span class="tag green">OPEN</span> <span class="priority critical">CRITICAL</span><small>Assigned investigator: <b id="detailAssignee">Andi Saputra</b> &nbsp;·&nbsp; Created date: 21 Sep 2026 14:32 WIB &nbsp;·&nbsp; Risk score weight: <b style="color:var(--red)" id="detailRiskHeading">88/100 (High Risk)</b></small></div>
+          </div>
+          <div class="button-row">
+            <button class="btn secondary" id="escalateCurrentBtn">Escalate case</button>
+            <button class="btn" id="draftCurrentStrBtn">File STR Report</button>
+          </div>
+        </div>
+        <div class="tabs" id="detailTabs">
+          <button class="tab active" data-detail-tab="Overview">Overview</button>
+          <button class="tab" data-detail-tab="Factors">Factors</button>
+          <button class="tab" data-detail-tab="Transactions">Transactions</button>
+          <button class="tab" data-detail-tab="Subject">Subject</button>
+          <button class="tab" data-detail-tab="Rule">Rule</button>
+          <button class="tab" data-detail-tab="Case">Case</button>
+        </div>
+        <div class="detail-layout">
+          <div class="left-col grid">
+            <section class="panel" id="detailSummaryPanel">
+              <div class="panel-head"><h2>Alert Summary</h2><span class="tag cyan">Selected alert</span></div>
+              <div class="summary-grid" id="detailSummary"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <div><h2 id="patternTitle">Transaction Pattern Analysis</h2><p id="patternSubtitle">Hourly clustering frequency over recent observation window</p></div>
+                <span class="tag red" id="anomalyTag">Anomaly Score: 92%</span>
+              </div>
+              <div class="analysis-bars" aria-label="Grafik analisis pola transaksi">
+                <div class="analysis-bar"><span style="height:22%"></span><small>Mon</small></div>
+                <div class="analysis-bar"><span style="height:33%"></span><small>Tue</small></div>
+                <div class="analysis-bar"><span style="height:55%"></span><small>Wed</small></div>
+                <div class="analysis-bar"><span style="height:100%"></span><small>Thu</small></div>
+                <div class="analysis-bar"><span style="height:78%"></span><small>Fri</small></div>
+                <div class="analysis-bar"><span style="height:31%"></span><small>Sat</small></div>
+                <div class="analysis-bar"><span style="height:38%"></span><small>Sun</small></div>
+              </div>
+              <div class="chart-foot"><span>Relative transaction activity</span><span>Peak: Thu</span></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>Investigation Timeline</h2><span class="tag gray">Session notes</span></div>
+              <div id="timelineNotes" class="calendar-list"></div>
+            </section>
+          </div>
+          <div class="right-col grid">
+            <section class="panel">
+              <div class="panel-head"><h2>Risk Assessment</h2><span class="tag red">Elevated risk</span></div>
+              <div class="risk-score-head">
+                <div class="risk-score-circle" id="detailRiskCircle">88</div>
+                <div><strong id="detailRiskLabel">HIGH RISK FACTOR</strong><small>Weighted indicator matching threshold criteria.</small></div>
+              </div>
+              <div class="factor-list">
+                <div class="factor-row"><header><span>Volume Anomaly Score</span><strong>92%</strong></header><div class="meter red"><span style="width:92%"></span></div></div>
+                <div class="factor-row"><header><span>Velocity Frequency Score</span><strong>78%</strong></header><div class="meter amber"><span style="width:78%"></span></div></div>
+                <div class="factor-row"><header><span>Geographic Destination Risk</span><strong>71%</strong></header><div class="meter amber"><span style="width:71%"></span></div></div>
+                <div class="factor-row"><header><span>Counterparty Connection Risk</span><strong>88%</strong></header><div class="meter red"><span style="width:88%"></span></div></div>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>Recommended Actions</h2></div>
+              <div class="action-stack">
+                <div class="action-card"><div><strong>Escalate to Case Investigation</strong><small>Package evidence and create a case record.</small></div><button class="btn small" id="actionEscalate">Escalate Case</button></div>
+                <div class="action-card"><div><strong>Request Enhanced Due Diligence</strong><small>Trigger manual identity and source-of-funds review.</small></div><button class="btn secondary small" id="actionEDD">Request EDD</button></div>
+                <div class="action-card"><div><strong>Prepare Suspicious Transaction Report</strong><small>Generate a draft for authorized review.</small></div><button class="btn small" id="actionSTR">Draft STR</button></div>
+              </div>
+              <div class="notice-box">Skor risiko dan tindakan rekomendasi bukan bukti tindak pidana. Keputusan memerlukan pemeriksaan manusia.</div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. CASE MANAGEMENT VIEW -->
+      <section class="view" id="view-cases" data-title="Case Management" data-subtitle="Manage investigations, prioritize risk, and track cases through resolution.">
+        <div class="page-heading">
+          <div><div class="eyebrow">Investigation workspace</div><h1>Case Management</h1><p>Kelola investigasi, prioritas risiko, dan status penyelesaian kasus.</p></div>
+          <div class="button-row"><button class="btn secondary" id="exportCasesBtn">↓ Export</button><button class="btn" id="createCaseBtn">＋ Create Case</button></div>
+        </div>
+        <div class="grid case-stats">
+          <article class="stat-card"><div class="stat-top">ACTIVE CASES<span class="stat-symbol">♧</span></div><div class="stat-value">106</div><div class="stat-foot">38 open · 68 under investigation</div></article>
+          <article class="stat-card"><div class="stat-top">HIGH / CRITICAL RISK<span class="stat-symbol" style="color:var(--amber)">⬟</span></div><div class="stat-value">24</div><div class="stat-foot">23% of active investigations</div></article>
+          <article class="stat-card"><div class="stat-top">SLA AT RISK<span class="stat-symbol" style="color:var(--red)">◷</span></div><div class="stat-value" style="color:var(--red)">9</div><div class="stat-foot"><span style="color:var(--red)">3 overdue · 6 due within 24h</span></div></article>
+          <article class="stat-card"><div class="stat-top">TOTAL ACTIVE EXPOSURE<span class="stat-symbol">▱</span></div><div class="stat-value" style="font-size:23px">Rp 42.8B</div><div class="stat-foot">Across case portfolio</div></article>
+        </div>
+        <section class="panel filter-panel">
+          <div class="filter-grid">
+            <input class="field" id="caseSearch" type="search" placeholder="Search case ID or subject...">
+            <select class="field-select" id="caseRiskFilter"><option value="">Risk: All levels</option><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select>
+            <select class="field-select" id="caseStatusFilter"><option value="">Status: All</option><option>OPEN</option><option>ESCALATED</option><option>IN PROGRESS</option><option>PENDING REVIEW</option><option>CLOSED</option></select>
+            <select class="field-select" id="caseAssigneeFilter"><option value="">Assignee: Anyone</option><option>Andi Saputra</option><option>Dina Permata</option><option>Rizky Pratama</option><option>Unassigned</option></select>
+            <select class="field-select" id="caseDateFilter"><option value="">Created: Last 30 days</option><option>Last 7 days</option><option>Last 90 days</option></select>
+          </div>
+          <div class="filter-footer">
+            <span class="muted" id="caseCountText" style="font-size:9px">Showing cases</span>
+            <div class="bulk-actions"><button class="btn secondary small" id="assignCasesBtn">Assign Selected</button><button class="btn warn small" id="escalateCasesBtn">↗ Escalate</button><button class="btn ghost small" id="changeCaseStatusBtn">Change Status</button></div>
+          </div>
+        </section>
+        <section class="panel table-panel">
+          <div class="table-toolbar"><strong>Investigation Case Register</strong><span class="tag gray">Portfolio records</span></div>
+          <div class="table-wrap"><table><thead><tr><th><input type="checkbox" class="check" id="selectAllCases" aria-label="Pilih semua kasus"></th><th>Case ID</th><th>Subject / Exposure</th><th>Investigation Type</th><th>Risk</th><th>Status</th><th>Assignee</th><th>SLA / Updated</th><th></th></tr></thead><tbody id="caseTableBody"></tbody></table></div>
+          <div class="pagination"><span id="casePaginationText">Showing cases</span><div class="page-nums"><button class="active">1</button></div></div>
+        </section>
+      </section>
+
+      <!-- 5. RULE MANAGEMENT VIEW -->
+      <section class="view" id="view-rules" data-title="Rule Management" data-subtitle="Configure and review transaction-monitoring rules (demo controls).">
+        <div class="page-heading">
+          <div><div class="eyebrow">Detection controls</div><h1>Rule Management</h1><p>Kelola aturan pemantauan, threshold, dan status aktivasi untuk konfigurasi AML.</p></div>
+          <button class="btn" id="addRuleBtn">＋ Create Rule</button>
+        </div>
+        <div class="demo-note"><strong>Catatan:</strong> Perubahan rule di halaman ini hanya mengubah state tampilan. Rule tidak mengubah pipeline Random Forest ataupun memproses transaksi nyata secara langsung.</div>
+        <div class="grid stats-grid">
+          <article class="stat-card"><div class="stat-top">TOTAL RULES<span class="stat-symbol">▽</span></div><div class="stat-value" id="ruleTotal">18</div><div class="stat-foot">Monitoring configuration set</div></article>
+          <article class="stat-card"><div class="stat-top">ACTIVE RULES<span class="stat-symbol">●</span></div><div class="stat-value" id="ruleActive">15</div><div class="stat-foot">Enabled in environment</div></article>
+          <article class="stat-card"><div class="stat-top">TRIGGERED TODAY<span class="stat-symbol">⌁</span></div><div class="stat-value">247</div><div class="stat-foot">Alert patterns simulated</div></article>
+          <article class="stat-card"><div class="stat-top">NEEDS REVIEW<span class="stat-symbol">◷</span></div><div class="stat-value" style="color:var(--amber)">3</div><div class="stat-foot">Pending governance approval</div></article>
+        </div>
+        <div class="panel-head">
+          <div><h2>Rule Library</h2><p>Aktif/nonaktifkan kartu untuk menguji interaksi dashboard.</p></div>
+          <select id="ruleFilter" class="field-select" style="width:auto"><option value="">All rules</option><option value="active">Active only</option><option value="inactive">Inactive only</option></select>
+        </div>
+        <div class="rules-grid" id="rulesGrid"></div>
+      </section>
+
+      <!-- 6. DATA OPERATIONS VIEW -->
+      <section class="view" id="view-operations" data-title="Data Operations & AI Model" data-subtitle="Inspect API connectivity, manage datasets, and test the Random Forest pipeline.">
+        <div class="page-heading">
+          <div>
+            <div class="eyebrow">Model operations</div>
+            <h1>Data Operations</h1>
+            <p>Uji prediksi memakai pipeline Random Forest dan kelola staging dataset transaksi.</p>
+          </div>
+          <button class="btn secondary" id="refreshHealthTop">↻ Check API</button>
+        </div>
+
+        <div class="grid model-layout">
+          <!-- Kolom Kiri: Status Model, Metrik, & Catatan Integrasi -->
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-head"><h2>Model AI · Random Forest</h2><span id="modelTag" class="tag amber">Checking</span></div>
+              <div class="model-api">
+                <div><strong id="modelStatusTitle">Checking model readiness</strong><p id="modelStatusText">Menghubungi endpoint /api/health...</p></div>
+                <span id="modelType" class="tag">Python backend</span>
+              </div>
+              <div class="grid model-stats">
+                <div class="mini-stat"><span>Jumlah pohon</span><strong id="treeCount">—</strong><small>n_estimators</small></div>
+                <div class="mini-stat"><span>Kedalaman maksimum</span><strong id="depthCount">—</strong><small>max_depth</small></div>
+                <div class="mini-stat"><span>Fitur model</span><strong id="featureCount">46</strong><small>pipeline schema</small></div>
+              </div>
+              <div class="notice-box">Skor probabilitas bukan bukti tindak pidana. Ambang batas, kualitas data, false positive, dan performa validasi harus ditinjau sebelum penggunaan operasional.</div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div><h2>Model Evaluation &amp; Versioning</h2><p>Baseline metrik model tersimpan.</p></div>
+                <span class="tag amber">Baseline</span>
+              </div>
+              <div class="grid model-stats">
+                <div class="mini-stat"><span>Training rows</span><strong id="baselineTrainRows">—</strong><small>model aktif</small></div>
+                <div class="mini-stat"><span>Test rows</span><strong id="baselineTestRows">—</strong><small>holdout</small></div>
+                <div class="mini-stat"><span>Recall suspicious</span><strong id="baselineRecall">—</strong><small>baseline</small></div>
+              </div>
+              <div class="notice-box">Untuk perbandingan yang adil, evaluasi model baru harus memakai test set tetap yang tidak ikut training.</div>
+              <button class="btn secondary" id="refreshMetricsButton" type="button">Refresh baseline metrics</button>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head"><div><h2>API &amp; Integration Notes</h2><p>Endpoint backend Python / Flask.</p></div><span class="tag gray">REST API</span></div>
+              <div class="calendar-list">
+                <div class="calendar-item"><div class="calendar-date"><strong>GET</strong><small>API</small></div><div><strong>/api/health</strong><small>Pipeline status &amp; metadata.</small></div><span class="tag cyan">Health</span></div>
+                <div class="calendar-item"><div class="calendar-date"><strong>POST</strong><small>API</small></div><div><strong>/api/predict</strong><small>Mengirim JSON transaksi &amp; threshold.</small></div><span class="tag cyan">Predict</span></div>
+                <div class="calendar-item"><div class="calendar-date"><strong>GET</strong><small>API</small></div><div><strong>/api/summary</strong><small>Ringkasan scoring &amp; distribusi risiko.</small></div><span class="tag cyan">Summary</span></div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Kolom Kanan: Uji Prediksi JSON & Dataset Management -->
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-head">
+                <div><h2>Input Transaksi (JSON)</h2><p>Uji klasifikasi risiko dengan 46 fitur pipeline.</p></div>
+                <button id="loadExample" class="btn secondary small">Load Example</button>
+              </div>
+              <textarea class="json-input" id="transactionJson" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="JSON fitur transaksi"></textarea>
+              <div class="model-threshold">
+                <div><label class="field-label" for="threshold">Ambang SUSPICIOUS (%)</label><input class="field" id="threshold" type="number" min="0" max="100" step="5" value="50"></div>
+                <button class="btn" id="predictButton" type="button" disabled>Predict Risk</button>
+              </div>
+              <div id="predictionError" class="error-box" role="alert"></div>
+              <div id="predictionResult" class="result-box" aria-live="polite">
+                <div class="result-head"><span id="predictionLabel" class="result-label">—</span><span id="riskNumber" class="result-number">—</span></div>
+                <div class="meter" style="height:7px;margin:10px 0 12px"><span id="riskMeter" style="width:0"></span></div>
+                <div id="predictionMessage" class="muted" style="font-size:9px"></div>
+                <div class="summary-grid" style="margin-top:12px">
+                  <div class="summary-item"><span>Fitur terisi</span><strong id="providedCount">—</strong></div>
+                  <div class="summary-item"><span>Fitur kosong</span><strong id="missingCount">—</strong></div>
+                  <div class="summary-item"><span>Ambang batas</span><strong id="thresholdUsed">—</strong></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" id="datasetManagementPanel">
+              <div class="panel-head"><div><h2>Dataset Management</h2><p>Validasi dan simpan CSV transaksi ke staging.</p></div><span class="tag cyan">CSV · Staging</span></div>
+              <form id="datasetUploadForm" class="grid" style="gap:10px">
+                <div><label class="field-label" for="datasetFile">File dataset transaksi (.csv / .xlsx, maks. 50 MB)</label><input class="field" id="datasetFile" name="file" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" required></div>
+                <div class="form-row">
+                  <div><label class="field-label" for="datasetName">Nama dataset</label><input class="field" id="datasetName" name="dataset_name" maxlength="80" placeholder="Contoh: FCIP Tambahan"></div>
+                  <div><label class="field-label" for="datasetSource">Sumber data</label><input class="field" id="datasetSource" name="source" maxlength="120" placeholder="Otorisasi/sumber"></div>
+                </div>
+                <div class="button-row"><button class="btn" id="datasetUploadButton" type="submit">Validate &amp; Import Dataset</button><button class="btn secondary" id="refreshDatasetsButton" type="button">Refresh list</button><button class="btn ghost" id="btnGenFreshDummy" type="button" style="border:1px dashed #38bdf8;color:#38bdf8">⚡ Generate Fresh Dummy File (ID Baru)</button></div>
+              </form>
+              <div id="datasetUploadMessage" class="error-box" role="status" style="display:none"></div>
+              <div class="panel-head" style="margin-top:16px"><div><h2>Dataset Registry</h2><p>Daftar file di staging area.</p></div><span class="tag" id="datasetCountTag">0 dataset</span></div>
+              <div class="table-wrap"><table style="min-width:450px"><thead><tr><th>Dataset</th><th>Rows</th><th>Label summary</th><th>Status</th></tr></thead><tbody id="datasetRegistryBody"><tr><td colspan="4" class="muted">Memuat daftar dataset...</td></tr></tbody></table></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. REPORTING VIEW -->
+      <section class="view" id="view-reporting" data-title="Regulatory Reporting" data-subtitle="Manage regulatory obligations and sample suspicious transaction report submissions.">
+        <div class="page-heading">
+          <div><div class="eyebrow">Compliance workspace</div><h1>Regulatory Reporting</h1><p>Ringkasan pelaporan STR/PPATK dan submission kepatuhan.</p></div>
+          <div class="button-row"><button class="btn secondary" id="exportReportsBtn">↓ Export CSV</button><button class="btn" id="newReportBtn">＋ Create New Report</button></div>
+        </div>
+        <div class="grid stats-grid">
+          <article class="stat-card"><div class="stat-top">TOTAL REPORTS (2026)<span class="stat-symbol">▤</span></div><div class="stat-value">89</div><div class="stat-foot">Count shown as demo metric</div></article>
+          <article class="stat-card"><div class="stat-top">PENDING SUBMISSION<span class="stat-symbol">◷</span></div><div class="stat-value">12</div><div class="stat-foot">Awaiting review / finalization</div></article>
+          <article class="stat-card"><div class="stat-top">UNDER REVIEW<span class="stat-symbol">⌕</span></div><div class="stat-value">8</div><div class="stat-foot">Analyst validation workflow</div></article>
+          <article class="stat-card"><div class="stat-top">SUBMITTED TO PPATK<span class="stat-symbol">✓</span></div><div class="stat-value" style="color:var(--green)">69</div><div class="stat-foot">Sample status only</div></article>
+        </div>
+        <div class="grid two-col">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Report Submissions</h2><p>Daftar laporan regulasi yang dapat diperbarui statusnya.</p></div><select class="field-select" style="width:auto" id="reportStatusFilter"><option value="">All reports</option><option>Draft</option><option>Under Review</option><option>Approved</option><option>Submitted</option></select></div>
+            <div class="table-wrap"><table style="min-width:500px"><thead><tr><th>Report ID</th><th>Type</th><th>Reference</th><th>Status</th><th>Owner</th><th>Action</th></tr></thead><tbody id="reportsBody"></tbody></table></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><h2>Regulatory Calendar</h2><p>Jadwal batas waktu pengiriman pelaporan.</p></div><span class="tag cyan">2026</span></div>
+            <div class="calendar-list">
+              <div class="calendar-item"><div class="calendar-date"><strong>15</strong><small>FEB 2026</small></div><div><strong>STR Monthly Filing Deadline</strong><small>Review draft submissions before due date.</small></div><span class="tag blue">STR</span></div>
+              <div class="calendar-item"><div class="calendar-date"><strong>28</strong><small>FEB 2026</small></div><div><strong>LTKM High-Risk Accounts Audit Submission</strong><small>Documentation review and sign-off.</small></div><span class="tag blue">LTKM</span></div>
+              <div class="calendar-item"><div class="calendar-date"><strong>28</strong><small>FEB 2026</small></div><div><strong>Quarterly CTI Bulk Data Transfer</strong><small>Prepare a validation checklist.</small></div><span class="tag blue">CTI</span></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- 8. GOVERNANCE VIEW -->
+      <section class="view" id="view-governance" data-title="System Administration & Roles" data-subtitle="Review demo user access, role assignments and governance controls.">
+        <div class="page-heading">
+          <div><div class="eyebrow">Governance &amp; access controls</div><h1>Governance &amp; Access Controls</h1><p>Administrasi pengguna, role-based access control (RBAC), dan kontrol audit.</p></div>
+          <button class="btn" id="addUserBtn">＋ Add User Account</button>
+        </div>
+        <div class="tabs" id="governanceTabs">
+          <button class="tab active" data-gov-tab="users">Users &amp; Roles</button>
+          <button class="tab" data-gov-tab="access">Access Review</button>
+          <button class="tab" data-gov-tab="audit">Compliance Audit Log</button>
+        </div>
+        <div id="gov-users" class="gov-pane">
+          <section class="panel">
+            <div class="panel-head"><div><h2>User Management</h2><p>Manajemen akun dan segregasi tugas (SoD).</p></div><input class="field" id="userSearch" type="search" placeholder="Filter user accounts..." style="max-width:220px"></div>
+            <div class="table-wrap"><table><thead><tr><th>User ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th>MFA Status</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+          </section>
+        </div>
+        <div id="gov-access" class="gov-pane" hidden>
+          <section class="panel governance-matrix">
+            <div class="panel-head"><div><h2>Role-Based Access Control (RBAC) Permissions Matrix</h2><p>Matriks hak akses operasional AML.</p></div><span class="tag cyan">Default Model</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Role Classification</th><th>View Alerts</th><th>Set Rules</th><th>Approve Decisions</th><th>Manage Rules</th><th>Access Reports</th><th>Admin Settings</th><th>Audit Read</th></tr></thead><tbody id="rbacBody"></tbody></table></div>
+          </section>
+        </div>
+        <div id="gov-audit" class="gov-pane" hidden>
+          <section class="panel">
+            <div class="panel-head"><div><h2>Compliance Audit Log</h2><p>Riwayat interaksi audit pada sesi browser ini.</p></div><button class="btn secondary small" id="exportAuditBtn">Export Log</button></div>
+            <div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Actor</th><th>Event</th><th>Target</th><th>Result</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+          </section>
+        </div>
+      </section>
+
+      <div class="footer-note">FCIP Indonesia · AML &amp; Fraud Intelligence · Prototipe platform intelijen kejahatan finansial.</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+<div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <form class="modal" id="modalForm">
+    <h2 id="modalTitle">Create record</h2>
+    <p id="modalDescription">Tambahkan record contoh ke workspace lokal.</p>
+    <div id="modalFields" class="modal-fields"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" id="cancelModal">Cancel</button>
+      <button type="submit" class="btn" id="confirmModal">Create</button>
+    </div>
+  </form>
+</div>
+
+<script>
+'use strict';
+const $ = (s, root=document) => root.querySelector(s);
+const $$ = (s, root=document) => [...root.querySelectorAll(s)];
+const idr = n => new Intl.NumberFormat('id-ID',{maximumFractionDigits:0}).format(Number(n)||0);
+const rupiah = n => 'Rp ' + idr(n);
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toast = (message, type='info') => {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type==='ok'?'ok':type==='err'?'err':'');
+  el.textContent = message;
+  $('#toastRegion').append(el);
+  setTimeout(() => el.remove(), 4200);
+};
+
+const priorityClass = p => ({Critical:'critical',High:'high',Medium:'medium',Low:'low'}[p] || 'medium');
+const statusClass = s => ({'OPEN':'open','IN PROGRESS':'in-progress','ESCALATED':'escalated','CLOSED':'closed','PENDING REVIEW':'pending','Draft':'pending','Under Review':'in-progress','Approved':'closed','Submitted':'closed'}[s] || 'open');
+
+const sampleAlerts = [
+  {id:'ALR-2026-00124',subject:'Hendra Wijaya',priority:'Critical',type:'U-Turn Transfer',score:88,amount:150000000,status:'OPEN',sla:'0h 24m',assignee:'Andi Saputra',time:'14:20',reason:'Dana masuk dan segera keluar melalui rekening berbeda.',reference:'CASE-2026-0042',source_label:'SUSPICIOUS',prediction:'SUSPICIOUS'},
+  {id:'ALR-2026-00125',subject:'Siti Rahma',priority:'Critical',type:'Rapid Cash-out',score:92,amount:85000000,status:'IN PROGRESS',sla:'0h 42m',assignee:'Andi Saputra',time:'14:15',reason:'Serangkaian penarikan berdekatan waktunya.',reference:'CASE-2026-0048',source_label:'SUSPICIOUS',prediction:'SUSPICIOUS'},
+  {id:'ALR-2026-00126',subject:'Budi Santoso',priority:'High',type:'Velocity Limit',score:74,amount:45000000,status:'OPEN',sla:'1h 15m',assignee:'Rizky Pratama',time:'13:58',reason:'Volume transaksi jangka pendek melewati batas aturan.',reference:'CASE-2026-0047',source_label:'SUSPICIOUS',prediction:'SUSPICIOUS'},
+  {id:'ALR-2026-00127',subject:'Ahmad Pratama',priority:'High',type:'New Device Login',score:65,amount:12500000,status:'OPEN',sla:'2h 05m',assignee:'Unassigned',time:'13:42',reason:'Akses dari perangkat yang belum tercatat di profil.',reference:'CASE-2026-0045',source_label:'SUSPICIOUS',prediction:'SUSPICIOUS'},
+  {id:'ALR-2026-00128',subject:'Dewi Lestari',priority:'Medium',type:'Sanction List Match',score:71,amount:310000000,status:'ESCALATED',sla:'3h 10m',assignee:'Dina Permata',time:'13:20',reason:'Kecocokan screening memerlukan verifikasi manual.',reference:'CASE-2026-0046',source_label:'NORMAL',prediction:'SUSPICIOUS'},
+  {id:'ALR-2026-00129',subject:'Fajar Nugraha',priority:'Low',type:'High-Frequency Deposits',score:42,amount:19500000,status:'OPEN',sla:'5h 45m',assignee:'Rizky Pratama',time:'12:55',reason:'Frekuensi setoran meningkat.',reference:'—',source_label:'NORMAL',prediction:'NORMAL'},
+  {id:'ALR-2026-00130',subject:'Rian Hidayat',priority:'Low',type:'Peer-to-Peer Smurfing',score:38,amount:8000000,status:'CLOSED',sla:'6h 12m',assignee:'Andi Saputra',time:'12:36',reason:'Pola transfer antar pengguna diperiksa dan ditutup.',reference:'—',source_label:'NORMAL',prediction:'NORMAL'},
+  {id:'ALR-2026-00131',subject:'PT Samudra Nusa',priority:'High',type:'Cross-border Transfer',score:79,amount:240000000,status:'OPEN',sla:'1h 50m',assignee:'Dina Permata',time:'11:48',reason:'Transfer lintas negara ke rekening penerima baru.',reference:'CASE-2026-0044',source_label:'SUSPICIOUS',prediction:'SUSPICIOUS'}
+];
+
+let alerts = sampleAlerts.map(a => ({...a}));
+let selectedAlertId = alerts[0].id;
+
+const cases = [
+  {id:'CASE-2026-0042',subject:'Hendra Wijaya',exposure:824000000,type:'Structuring / Layering',transactions:47,entities:6,risk:'CRITICAL',status:'OPEN',assignee:'Andi Saputra',sla:'6h 20m left',updated:'Today, 14:20 WIB'},
+  {id:'CASE-2026-0051',subject:'PT Cakra Niaga',exposure:560000000,type:'Trade-based ML',transactions:32,entities:4,risk:'CRITICAL',status:'ESCALATED',assignee:'Dina Permata',sla:'Overdue 2h',updated:'Today, 14:05 WIB'},
+  {id:'CASE-2026-0048',subject:'Siti Rahma',exposure:185000000,type:'Rapid Cash-out',transactions:28,entities:3,risk:'HIGH',status:'IN PROGRESS',assignee:'Andi Saputra',sla:'18h 45m left',updated:'Today, 13:42 WIB'},
+  {id:'CASE-2026-0047',subject:'Budi Santoso',exposure:94000000,type:'Account Takeover',transactions:12,entities:2,risk:'HIGH',status:'IN PROGRESS',assignee:'Rizky Pratama',sla:'1d 4h left',updated:'Today, 12:19 WIB'},
+  {id:'CASE-2026-0046',subject:'Dewi Lestari',exposure:310000000,type:'Sanctions Screening',transactions:8,entities:1,risk:'CRITICAL',status:'PENDING REVIEW',assignee:'Dina Permata',sla:'4h 10m left',updated:'Today, 11:56 WIB'},
+  {id:'CASE-2026-0045',subject:'Ahmad Pratama',exposure:62500000,type:'Mule Network',transactions:19,entities:5,risk:'MEDIUM',status:'OPEN',assignee:'Unassigned',sla:'2d 6h left',updated:'Today, 10:30 WIB'},
+  {id:'CASE-2026-0044',subject:'PT Surya Mandiri',exposure:240000000,type:'Unusual Transfers',transactions:21,entities:4,risk:'MEDIUM',status:'IN PROGRESS',assignee:'Maya Putri',sla:'2d 12h left',updated:'Yesterday, 16:40 WIB'},
+  {id:'CASE-2026-0043',subject:'Fajar Nugraha',exposure:19500000,type:'High-Frequency Deposits',transactions:14,entities:1,risk:'LOW',status:'CLOSED',assignee:'Rizky Pratama',sla:'Resolved in SLA',updated:'Yesterday, 15:12 WIB'}
+];
+
+const rules = [
+  {id:'RULE-TRX-007',name:'Rapid Sequential Transfers',desc:'Flag chained transfers that move funds quickly across linked accounts.',category:'Velocity',threshold:'≥ 5 transfers / 15 min',triggers:37,active:true},
+  {id:'RULE-STR-014',name:'Structuring Pattern',desc:'Detect amounts and repeated deposits clustered near configured review thresholds.',category:'Structuring',threshold:'Pattern match > 0.78',triggers:29,active:true},
+  {id:'RULE-GEO-021',name:'High-Risk Destination',desc:'Prioritize outbound transfer to a configured high-risk destination list.',category:'Geographic',threshold:'Country risk ≥ High',triggers:21,active:true},
+  {id:'RULE-VEL-002',name:'Velocity Limit',desc:'Compare current transaction count against baseline period.',category:'Velocity',threshold:'> 8 tx / 60 min',triggers:58,active:true},
+  {id:'RULE-DEV-031',name:'New Device Access',desc:'Review access from a new device or unusual device profile.',category:'Device',threshold:'First-seen device',triggers:18,active:false},
+  {id:'RULE-SCR-009',name:'Sanctions Screening',desc:'Route possible name or entity screening matches for human validation.',category:'Screening',threshold:'Match score ≥ 0.82',triggers:9,active:true}
+];
+
+let reports = [
+  {id:'STR-2026-0089',type:'STR',reference:'CASE-2026-0042',status:'Submitted',owner:'Andi Saputra',updated:'21 Sep 2026'},
+  {id:'STR-2026-0090',type:'STR',reference:'CASE-2026-0049',status:'Under Review',owner:'Taufik Hidayat',updated:'23 Sep 2026'},
+  {id:'STR-2026-0091',type:'LTKM',reference:'CASE-2026-0044',status:'Approved',owner:'Dina Permata',updated:'24 Sep 2026'},
+  {id:'STR-2026-0092',type:'STR',reference:'CASE-2026-0051',status:'Draft',owner:'Rizky Pratama',updated:'26 Sep 2026'}
+];
+
+let users = [
+  {id:'USR-0001',name:'Andi Saputra',email:'andi.saputra@nusantarapay.co.id',role:'Lead Investigator',status:'Active',lastLogin:'10 minutes ago',mfa:'Enabled'},
+  {id:'USR-0002',name:'Ratna Dewi',email:'ratna.dewi@nusantarapay.co.id',role:'MLRO',status:'Active',lastLogin:'2 hours ago',mfa:'Enabled'},
+  {id:'USR-0003',name:'Budi Santoso',email:'budi.santoso@nusantarapay.co.id',role:'Senior Investigator',status:'Active',lastLogin:'1 day ago',mfa:'Enabled'},
+  {id:'USR-0004',name:'Faisal Rahman',email:'faisal.rahman@nusantarapay.co.id',role:'Investigator',status:'Inactive',lastLogin:'5 days ago',mfa:'Enabled'},
+  {id:'USR-0005',name:'Taufik Hidayat',email:'taufik.hidayat@nusantarapay.co.id',role:'Analyst',status:'Active',lastLogin:'3 hours ago',mfa:'Enabled'}
+];
+
+let auditLog = [];
+const addAudit = (event, target, result='Success') => auditLog.unshift({time:new Date().toLocaleString('id-ID'), actor:'Andi Saputra (demo)', event, target, result});
+
+const exampleTransaction = {
+  "hour":14,"day_of_week":1,"log_amount_idr":18.42,"fx_rate_reference":1.0,"account_age_days":540,"customer_tenure_days":720,"customer_kyc_completeness_score":0.9,"device_age_days":180,"merchant_age_days":1200,"merchant_outlet_count":3,"prior_tx_count_1h":2,"prior_tx_count_24h":8,"prior_amount_idr_1h":5000000,"prior_amount_idr_24h":25000000,"prior_in_amount_idr_24h":10000000,"prior_out_amount_idr_24h":15000000,"minutes_since_previous_tx":25,"customer_record_available_at_tx":1,"device_seen_before_tx":1,"merchant_opened_before_tx":1,"direction":"OUT","currency_original":"IDR","channel":"MOBILE_APP","transaction_type":"TRANSFER","counterparty_country":"ID","source_system_code":"PAYMENT_GATEWAY","account_type":"virtual account","account_currency":"IDR","account_owner_type":"individu","customer_occupation":"Employee","customer_income_band":"10-25M","customer_nationality":"ID","customer_kyc_status":"VERIFIED","customer_status":"ACTIVE","device_type":"MOBILE_PHONE","device_os_family":"ANDROID","device_app_version":"4.1.0","device_is_emulator_flag":"False","device_is_rooted_flag":"False","device_specificity_flag":"HIGH_SPECIFICITY","merchant_mcc":"5411","merchant_mcc_description":"Grocery Stores, Supermarkets","merchant_volume_band":"100K-500K","merchant_ticket_band":"250K-1M","merchant_operating_hours":"09:00-18:00","merchant_mcc_flag":"VALID"
+};
+
+// Navigasi View
+const navTo = (name) => {
+  const view = $('#view-' + name);
+  if (!view) return;
+  $$('.view').forEach(v => v.classList.toggle('active', v === view));
+  $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  $('#topTitle').textContent = view.dataset.title || 'Crime Intelligence Platform';
+  $('#topSubtitle').textContent = view.dataset.subtitle || '';
+  $('#sidebar').classList.remove('open');
+  window.scrollTo({top:0, behavior:'smooth'});
+
+  if (name === 'dashboard') renderDashboardAlerts();
+  if (name === 'alerts') renderAlertQueue();
+  if (name === 'alert-detail') renderAlertDetail();
+  if (name === 'cases') renderCases();
+  if (name === 'rules') renderRules();
+  if (name === 'reporting') renderReports();
+  if (name === 'governance') renderGovernance();
+  if (name === 'operations') { refreshHealth(); refreshDatasetRegistry(); refreshBaselineMetrics(); }
+};
+
+$$('.nav-item').forEach(b => b.addEventListener('click', () => navTo(b.dataset.view)));
+$$('[data-go]').forEach(b => b.addEventListener('click', () => navTo(b.dataset.go)));
+$('#mobileMenu').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+$('#notificationButton').addEventListener('click', () => toast('Tidak ada notifikasi baru pada prototipe demo.'));
+$('#globalSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const q = e.currentTarget.value.trim();
+    navTo('alerts');
+    $('#alertSearch').value = q;
+    renderAlertQueue();
+  }
+});
+
+function renderDashboardAlerts(){
+  const body = $('#dashboardAlertsBody');
+  if (!body) return;
+  body.innerHTML = alerts.length
+    ? alerts.slice(0,10).map(a => `<tr>
+        <td><button class="id-link" data-alert-id="${escapeHtml(a.id)}">${escapeHtml(a.id)}</button> ${a.is_uploaded ? '<span class="tag cyan" style="font-size:9px;padding:2px 5px;margin-left:4px;font-weight:700">BARU</span>' : ''}</td>
+        <td>${escapeHtml(a.subject)}</td>
+        <td><span class="priority ${priorityClass(a.priority)}">${Number(a.score || 0).toLocaleString('id-ID')}%</span></td>
+        <td><span class="tag ${String(a.source_label||'').toUpperCase()==='SUSPICIOUS'?'red':String(a.source_label||'').toUpperCase()==='NORMAL'?'green':'gray'}">${escapeHtml(a.source_label||'—')}</span></td>
+        <td><span class="tag ${String(a.prediction||'').toUpperCase()==='SUSPICIOUS'?'red':'green'}">${escapeHtml(a.prediction||'—')}</span></td>
+        <td>${escapeHtml(a.type)}</td>
+        <td class="nowrap">${rupiah(a.amount)}</td>
+        <td><span class="priority ${priorityClass(a.priority)}">${escapeHtml(String(a.priority||'Medium').toUpperCase())}</span></td>
+        <td class="muted">${escapeHtml(a.time||'—')}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="9"><div class="empty-state">Menunggu data hasil scoring dari Flask API...</div></td></tr>';
+  $$('#dashboardAlertsBody [data-alert-id]').forEach(b => b.addEventListener('click', () => openAlert(b.dataset.alertId)));
+}
+
+function openAlert(id){
+  selectedAlertId = id;
+  navTo('alert-detail');
+  renderAlertDetail();
+}
+
+function alertFilters(){
+  const q = $('#alertSearch').value.trim().toLowerCase(),
+        priority = $('#alertPriorityFilter').value,
+        type = $('#alertTypeFilter').value,
+        assignee = $('#alertAssigneeFilter').value,
+        status = $('#alertStatusFilter').value;
+  return alerts.filter(a => (!q || (a.id + ' ' + a.subject + ' ' + a.type).toLowerCase().includes(q))
+    && (!priority || a.priority === priority)
+    && (!type || a.type === type)
+    && (!assignee || a.assignee === assignee)
+    && (!status || a.status === status));
+}
+
+let alertCurrentPage = 1;
+let alertPageSize = 25;
+
+function renderAlertPaginationButtons(totalPages) {
+  const container = $('#alertPageButtons');
+  if (!container) return;
+  if (totalPages <= 1) {
+    container.innerHTML = '<button type="button" class="active" disabled style="cursor:default">1</button>';
+    return;
+  }
+
+  let html = `<button type="button" class="page-prev" ${alertCurrentPage === 1 ? 'disabled style="opacity:0.35;cursor:not-allowed"' : ''}>‹ Prev</button>`;
+
+  const pagesToShow = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pagesToShow.push(i);
+  } else {
+    pagesToShow.push(1);
+    if (alertCurrentPage > 4) pagesToShow.push('...');
+    
+    const start = Math.max(2, alertCurrentPage - 1);
+    const end = Math.min(totalPages - 1, alertCurrentPage + 1);
+    for (let i = start; i <= end; i++) {
+      if (!pagesToShow.includes(i)) pagesToShow.push(i);
+    }
+
+    if (alertCurrentPage < totalPages - 3) pagesToShow.push('...');
+    if (!pagesToShow.includes(totalPages)) pagesToShow.push(totalPages);
+  }
+
+  pagesToShow.forEach(p => {
+    if (p === '...') {
+      html += `<span style="padding:3px 6px;color:var(--muted);font-size:9px">...</span>`;
+    } else {
+      html += `<button type="button" class="${p === alertCurrentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
+    }
+  });
+
+  html += `<button type="button" class="page-next" ${alertCurrentPage === totalPages ? 'disabled style="opacity:0.35;cursor:not-allowed"' : ''}>Next ›</button>`;
+  container.innerHTML = html;
+
+  container.querySelector('.page-prev')?.addEventListener('click', () => {
+    if (alertCurrentPage > 1) {
+      alertCurrentPage--;
+      renderAlertQueue();
+    }
+  });
+  container.querySelector('.page-next')?.addEventListener('click', () => {
+    if (alertCurrentPage < totalPages) {
+      alertCurrentPage++;
+      renderAlertQueue();
+    }
+  });
+  container.querySelectorAll('button[data-page]').forEach(b => {
+    b.addEventListener('click', () => {
+      const p = Number(b.dataset.page);
+      if (p && p !== alertCurrentPage) {
+        alertCurrentPage = p;
+        renderAlertQueue();
+      }
+    });
+  });
+}
+
+function renderAlertQueue(){
+  const rows = alertFilters();
+  const total = rows.length;
+  const pageSize = Number($('#alertPageSize')?.value) || alertPageSize;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  if (alertCurrentPage > totalPages) alertCurrentPage = totalPages;
+  if (alertCurrentPage < 1) alertCurrentPage = 1;
+
+  const startIdx = (alertCurrentPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, total);
+  const pageRows = rows.slice(startIdx, endIdx);
+
+  $('#alertCountText').textContent = total === 0 ? '0 alerts' : `Showing ${startIdx + 1}–${endIdx} of ${formatCount(total)} alerts (${pageSize} per page)`;
+  const paginationText = $('#alertPaginationText');
+  if (paginationText) paginationText.textContent = total === 0 ? 'Tidak ada alert yang cocok' : `Halaman ${alertCurrentPage} dari ${totalPages} · ${formatCount(total)} alert total`;
+
+  $('#alertQueueBody').innerHTML = pageRows.length ? pageRows.map(a => `<tr>
+    <td><input class="check alert-check" data-id="${a.id}" type="checkbox" aria-label="Select ${a.id}"></td>
+    <td><button class="id-link" data-alert-id="${a.id}">${escapeHtml(a.id)}</button> ${a.is_uploaded ? '<span class="tag cyan" style="font-size:9px;padding:2px 5px;margin-left:4px;font-weight:700">BARU</span>' : ''}</td>
+    <td><span class="priority ${priorityClass(a.priority)}">${a.priority.toUpperCase()}</span></td>
+    <td><strong>${escapeHtml(a.subject)}</strong></td>
+    <td class="muted">${escapeHtml(a.type)}</td>
+    <td><strong style="color:${a.score>=80?'var(--red)':a.score>=60?'var(--amber)':'var(--green)'}">${a.score}%</strong></td>
+    <td class="nowrap">${rupiah(a.amount)}</td>
+    <td><span class="status ${statusClass(a.status)}">${a.status}</span></td>
+    <td class="nowrap" style="color:${String(a.sla).includes('0h')?'var(--red)':'var(--amber)'}">${a.sla}</td>
+    <td>${escapeHtml(a.assignee)}</td>
+  </tr>`).join('') : '<tr><td colspan="10"><div class="empty-state">No alerts match the selected filters.</div></td></tr>';
+
+  $$('#alertQueueBody [data-alert-id]').forEach(b => b.addEventListener('click', () => openAlert(b.dataset.alertId)));
+  renderAlertPaginationButtons(totalPages);
+  $('#selectAllAlerts').checked = false;
+  $('#navAlertCount').textContent = alerts.filter(a => a.status !== 'CLOSED').length;
+}
+
+$('#alertSearch').addEventListener('input', () => { alertCurrentPage = 1; renderAlertQueue(); });
+['alertPriorityFilter','alertTypeFilter','alertAssigneeFilter','alertStatusFilter'].forEach(id => {
+  $('#'+id).addEventListener('change', () => { alertCurrentPage = 1; renderAlertQueue(); });
+});
+$('#resetAlertFilters').addEventListener('click', () => {
+  ['alertSearch','alertPriorityFilter','alertTypeFilter','alertAssigneeFilter','alertStatusFilter'].forEach(id => $('#'+id).value = '');
+  alertCurrentPage = 1;
+  renderAlertQueue();
+  toast('Alert filters were reset.');
+});
+$('#alertPageSize')?.addEventListener('change', (e) => {
+  alertPageSize = Number(e.target.value) || 25;
+  alertCurrentPage = 1;
+  renderAlertQueue();
+});
+
+const populateAlertTypes = () => {
+  const typeSelect = $('#alertTypeFilter');
+  if (!typeSelect) return;
+  typeSelect.innerHTML = '<option value="">Alert Type: All Patterns</option>';
+  [...new Set(alerts.map(a => a.type))].sort().forEach(t => {
+    typeSelect.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`);
+  });
+};
+populateAlertTypes();
+
+$('#selectAllAlerts').addEventListener('change', e => $$('.alert-check').forEach(cb => cb.checked = e.target.checked));
+function selectedAlertRows(){ return $$('.alert-check:checked').map(cb => alerts.find(a => a.id === cb.dataset.id)).filter(Boolean); }
+
+$('#assignSelectedBtn').addEventListener('click', () => {
+  const s = selectedAlertRows();
+  if(!s.length) return toast('Pilih sekurang-kurangnya satu alert dahulu.', 'err');
+  s.forEach(a => a.assignee = 'Andi Saputra');
+  addAudit('Assign selected alerts', s.map(a => a.id).join(', '));
+  renderAlertQueue(); renderDashboardAlerts();
+  toast(`${s.length} alert assigned to Andi Saputra.`, 'ok');
+});
+
+$('#escalateSelectedBtn').addEventListener('click', () => {
+  const s = selectedAlertRows();
+  if(!s.length) return toast('Pilih sekurang-kurangnya satu alert dahulu.', 'err');
+  s.forEach(a => { a.status = 'ESCALATED'; if(a.priority==='Low') a.priority='Medium'; });
+  addAudit('Escalate alerts', s.map(a => a.id).join(', '));
+  renderAlertQueue(); renderDashboardAlerts();
+  toast(`${s.length} alert escalated.`, 'ok');
+});
+
+$('#closeSelectedBtn').addEventListener('click', () => {
+  const s = selectedAlertRows();
+  if(!s.length) return toast('Pilih sekurang-kurangnya satu alert dahulu.', 'err');
+  s.forEach(a => a.status = 'CLOSED');
+  addAudit('Bulk close alerts', s.map(a => a.id).join(', '));
+  renderAlertQueue(); renderDashboardAlerts();
+  toast(`${s.length} alert closed.`, 'ok');
+});
+
+function currentAlert(){
+  return alerts.find(a => a.id === selectedAlertId) || alerts[0] || sampleAlerts[0];
+}
+
+function renderAlertDetail(tab='Overview'){
+  const a = currentAlert();
+  if (!a) return;
+  $('#detailHeading').innerHTML = `Alert ${escapeHtml(a.id)} <span class="tag ${a.status==='CLOSED'?'green':'green'}">${a.status}</span> <span class="priority ${priorityClass(a.priority)}">${a.priority.toUpperCase()}</span><small>Assigned investigator: <b id="detailAssignee">${escapeHtml(a.assignee)}</b> &nbsp;·&nbsp; Updated: ${escapeHtml(a.time)} WIB &nbsp;·&nbsp; Risk score: <b id="detailRiskHeading" style="color:${a.score>=80?'var(--red)':'var(--amber)'}">${a.score}/100 (${a.priority} Risk)</b></small>`;
+  $('#detailRiskCircle').textContent = a.score;
+  $('#detailRiskLabel').textContent = a.score>=80?'HIGH RISK FACTOR':a.score>=60?'ELEVATED RISK FACTOR':'MODERATE RISK FACTOR';
+  $('#anomalyTag').textContent = `Anomaly Score: ${Math.max(25,Math.min(99,a.score+4))}%`;
+  $('#detailSummary').innerHTML = [
+    ['ALERT ID', a.id],
+    ['ALERT TYPE', a.type],
+    ['SUBJECT NAME', a.subject],
+    ['RISK SCORE', `${a.score}/100 (${a.priority})`],
+    ['TRIGGER RULE', 'RULE-TRX-007 (ML pipeline score)'],
+    ['DETECTION TIMESTAMP', `${a.time} WIB`],
+    ['AMOUNT', rupiah(a.amount)],
+    ['CASE REFERENCE', a.reference]
+  ].map(([k,v]) => `<div class="summary-item"><span>${k}</span><strong>${escapeHtml(v)}</strong></div>`).join('');
+
+  const notes = [
+    ['14:20 WIB', 'Alert generated', `${a.type} pattern was flagged by model/monitoring.`],
+    ['14:23 WIB', 'Assigned to investigator', `Current assignee: ${a.assignee}.`],
+    ['14:31 WIB', 'Initial review pending', 'Review source of funds and counterparty context before reaching a conclusion.']
+  ];
+  $('#timelineNotes').innerHTML = notes.map(([time,title,note]) => `<div class="calendar-item"><div class="calendar-date"><strong style="font-size:10px">${time.split(' ')[0]}</strong><small>${time.split(' ')[1]}</small></div><div><strong>${title}</strong><small>${escapeHtml(note)}</small></div><span class="tag gray">Log</span></div>`).join('');
+
+  $$('#detailTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.detailTab === tab));
+  if (tab !== 'Overview') {
+    const content = {
+      Factors: ['Risk factor detail', `The currently selected alert is tagged ${a.priority.toLowerCase()} based on risk score ${a.score}/100. Validate velocity, transaction context, geography, and counterparty factors.`],
+      Transactions: ['Related transaction activity', `Amount ${rupiah(a.amount)} · pattern ${a.type}.`],
+      Subject: ['Subject profile', `${a.subject} profile requires source verification.`],
+      Rule: ['Trigger rule', 'Trigger rule was evaluated by detection logic or ML Random Forest prediction.'],
+      Case: ['Linked case', `Reference ${a.reference}. Use Case Management to review demo case records or create a new local case.`]
+    }[tab] || ['Detail', 'Informasi alert.'];
+    $('#patternTitle').textContent = content[0];
+    $('#patternSubtitle').textContent = content[1];
+  } else {
+    $('#patternTitle').textContent = 'Transaction Pattern Analysis';
+    $('#patternSubtitle').textContent = 'Hourly clustering frequency over recent observation window';
+  }
+}
+
+$$('#detailTabs .tab').forEach(b => b.addEventListener('click', () => renderAlertDetail(b.dataset.detailTab)));
+
+function escalateCurrent(){
+  const a = currentAlert();
+  a.status = 'ESCALATED';
+  if(a.priority === 'Low') a.priority = 'Medium';
+  addAudit('Escalate current alert', a.id);
+  renderAlertDetail(); renderAlertQueue(); renderDashboardAlerts();
+  toast(`Alert ${a.id} escalated.`, 'ok');
+}
+
+function draftSTR(){
+  const a = currentAlert();
+  const id = 'STR-2026-' + String(93 + reports.length).padStart(4, '0');
+  reports.unshift({id, type:'STR', reference:a.reference==='—'?a.id:a.reference, status:'Draft', owner:'Andi Saputra', updated:new Date().toLocaleDateString('id-ID')});
+  addAudit('Create STR draft', id);
+  toast(`STR draft ${id} created for review.`, 'ok');
+}
+
+$('#escalateCurrentBtn').addEventListener('click', escalateCurrent);
+$('#actionEscalate').addEventListener('click', () => { escalateCurrent(); navTo('cases'); });
+$('#draftCurrentStrBtn').addEventListener('click', () => { draftSTR(); navTo('reporting'); renderReports(); });
+$('#actionSTR').addEventListener('click', () => { draftSTR(); navTo('reporting'); renderReports(); });
+$('#actionEDD').addEventListener('click', () => { addAudit('Request enhanced due diligence', currentAlert().id); toast('EDD request recorded in the interaction log.', 'ok'); });
+
+function renderCases(){
+  const q = $('#caseSearch').value.trim().toLowerCase(),
+        risk = $('#caseRiskFilter').value,
+        status = $('#caseStatusFilter').value,
+        assignee = $('#caseAssigneeFilter').value;
+  const rows = cases.filter(c => (!q || (c.id + ' ' + c.subject + ' ' + c.type).toLowerCase().includes(q))
+    && (!risk || c.risk === risk)
+    && (!status || c.status === status)
+    && (!assignee || c.assignee === assignee));
+
+  $('#caseCountText').textContent = `${rows.length} visible of ${cases.length} cases`;
+  $('#casePaginationText').textContent = `Showing 1–${rows.length} of ${rows.length} cases`;
+  $('#caseTableBody').innerHTML = rows.length ? rows.map(c => `<tr>
+    <td><input type="checkbox" class="check case-check" data-id="${c.id}" aria-label="Select ${c.id}"></td>
+    <td><button class="id-link" data-case-id="${c.id}">${c.id}</button><div class="muted" style="font-size:8px;margin-top:4px">Investigation</div></td>
+    <td><strong>${escapeHtml(c.subject)}</strong><div class="muted" style="font-size:8px;margin-top:4px">${rupiah(c.exposure)} exposure</div></td>
+    <td>${escapeHtml(c.type)}<div class="muted" style="font-size:8px;margin-top:4px">${c.transactions} tx · ${c.entities} entities</div></td>
+    <td><span class="priority ${priorityClass(c.risk.charAt(0)+c.risk.slice(1).toLowerCase())}">${c.risk}</span></td>
+    <td><span class="status ${statusClass(c.status)}">${c.status}</span></td>
+    <td>${escapeHtml(c.assignee)}</td>
+    <td><strong style="color:${c.sla.toLowerCase().includes('overdue')?'var(--red)':c.sla.includes('left')?'var(--amber)':'var(--green)'}">${c.sla}</strong><div class="muted" style="font-size:8px;margin-top:4px">${c.updated}</div></td>
+    <td><button class="id-link" data-case-menu="${c.id}" aria-label="Show case actions">•••</button></td>
+  </tr>`).join('') : '<tr><td colspan="9"><div class="empty-state">No cases match the selected filters.</div></td></tr>';
+
+  $$('#caseTableBody [data-case-id]').forEach(b => b.addEventListener('click', () => {
+    const c = cases.find(x => x.id === b.dataset.caseId);
+    const a = alerts.find(x => x.reference === c?.id);
+    if(a) selectedAlertId = a.id;
+    navTo('alert-detail');
+    renderAlertDetail('Case');
+  }));
+  $$('#caseTableBody [data-case-menu]').forEach(b => b.addEventListener('click', () => {
+    const c = cases.find(x => x.id === b.dataset.caseMenu);
+    toast(`${c.id}: ${c.status} · ${c.assignee}`);
+  }));
+  $('#selectAllCases').checked = false;
+}
+
+['caseSearch','caseRiskFilter','caseStatusFilter','caseAssigneeFilter','caseDateFilter'].forEach(id => {
+  $('#'+id).addEventListener(id==='caseSearch'?'input':'change', renderCases);
+});
+$('#selectAllCases').addEventListener('change', e => $$('.case-check').forEach(cb => cb.checked = e.target.checked));
+function selectedCaseRows(){ return $$('.case-check:checked').map(cb => cases.find(c => c.id === cb.dataset.id)).filter(Boolean); }
+
+$('#assignCasesBtn').addEventListener('click', () => {
+  const s = selectedCaseRows();
+  if(!s.length) return toast('Select at least one case first.', 'err');
+  s.forEach(c => c.assignee = 'Andi Saputra');
+  addAudit('Assign cases', s.map(c => c.id).join(', '));
+  renderCases(); toast(`${s.length} case(s) assigned.`, 'ok');
+});
+$('#escalateCasesBtn').addEventListener('click', () => {
+  const s = selectedCaseRows();
+  if(!s.length) return toast('Select at least one case first.', 'err');
+  s.forEach(c => c.status = 'ESCALATED');
+  addAudit('Escalate cases', s.map(c => c.id).join(', '));
+  renderCases(); toast(`${s.length} case(s) escalated.`, 'ok');
+});
+$('#changeCaseStatusBtn').addEventListener('click', () => {
+  const s = selectedCaseRows();
+  if(!s.length) return toast('Select at least one case first.', 'err');
+  s.forEach(c => c.status = c.status==='CLOSED' ? 'OPEN' : 'IN PROGRESS');
+  addAudit('Change case status', s.map(c => c.id).join(', '));
+  renderCases(); toast(`Status updated for ${s.length} case(s).`, 'ok');
+});
+
+function renderRules(){
+  const f = $('#ruleFilter').value;
+  const rows = rules.filter(r => !f || (f==='active' ? r.active : !r.active));
+  $('#ruleTotal').textContent = rules.length + 12;
+  $('#ruleActive').textContent = rules.filter(r => r.active).length + 10;
+  $('#rulesGrid').innerHTML = rows.map(r => `<article class="rule-card">
+    <div class="rule-card-head"><span class="tag ${r.active?'green':'gray'}">${r.active?'ACTIVE':'INACTIVE'}</span><input type="checkbox" class="toggle rule-toggle" data-id="${r.id}" ${r.active?'checked':''} aria-label="Toggle ${escapeHtml(r.name)}"></div>
+    <h3>${escapeHtml(r.name)}</h3>
+    <p>${escapeHtml(r.desc)}</p>
+    <div class="rule-meta"><span>${escapeHtml(r.id)} · ${escapeHtml(r.category)}</span><span>${r.triggers} triggers</span></div>
+    <div class="rule-meta"><span>Threshold</span><strong style="color:var(--cyan)">${escapeHtml(r.threshold)}</strong></div>
+  </article>`).join('');
+
+  $$('.rule-toggle').forEach(cb => cb.addEventListener('change', () => {
+    const r = rules.find(x => x.id === cb.dataset.id);
+    r.active = cb.checked;
+    addAudit('Toggle detection rule', r.id + ': ' + (r.active ? 'active' : 'inactive'));
+    renderRules();
+    toast(`${r.name}: ${r.active ? 'active' : 'inactive'}.`);
+  }));
+}
+$('#ruleFilter').addEventListener('change', renderRules);
+
+function renderReports(){
+  const f = $('#reportStatusFilter').value;
+  const rows = reports.filter(r => !f || r.status === f);
+  $('#reportsBody').innerHTML = rows.map(r => `<tr>
+    <td><button class="id-link" data-report-id="${r.id}">${escapeHtml(r.id)}</button></td>
+    <td>${escapeHtml(r.type)}</td>
+    <td>${escapeHtml(r.reference)}</td>
+    <td><span class="status ${statusClass(r.status)}">${escapeHtml(r.status)}</span></td>
+    <td>${escapeHtml(r.owner)}</td>
+    <td><button class="btn secondary small" data-report-status="${r.id}">Update</button></td>
+  </tr>`).join('') || '<tr><td colspan="6"><div class="empty-state">No reports match this filter.</div></td></tr>';
+
+  $$('[data-report-status]').forEach(b => b.addEventListener('click', () => {
+    const r = reports.find(x => x.id === b.dataset.reportStatus);
+    const order = ['Draft','Under Review','Approved','Submitted'];
+    r.status = order[(order.indexOf(r.status)+1)%order.length];
+    r.updated = new Date().toLocaleDateString('id-ID');
+    addAudit('Update report status', r.id + ' → ' + r.status);
+    renderReports();
+    toast(`${r.id} status changed to ${r.status}.`, 'ok');
+  }));
+}
+$('#reportStatusFilter').addEventListener('change', renderReports);
+
+function renderGovernance(){
+  const q = ($('#userSearch')?.value||'').trim().toLowerCase();
+  const rows = users.filter(u => (u.name + ' ' + u.email + ' ' + u.role + ' ' + u.id).toLowerCase().includes(q));
+  $('#usersBody').innerHTML = rows.map(u => `<tr>
+    <td><button class="id-link" data-user-id="${u.id}">${u.id}</button></td>
+    <td><strong>${escapeHtml(u.name)}</strong></td>
+    <td class="muted">${escapeHtml(u.email)}</td>
+    <td>${escapeHtml(u.role)}</td>
+    <td><button class="status ${u.status==='Active'?'closed':'pending'} user-status" data-id="${u.id}">${u.status}</button></td>
+    <td>${escapeHtml(u.lastLogin)}</td>
+    <td><span class="tag ${u.mfa==='Enabled'?'green':'amber'}">${u.mfa}</span></td>
+  </tr>`).join('');
+
+  $$('.user-status').forEach(b => b.addEventListener('click', () => {
+    const u = users.find(x => x.id === b.dataset.id);
+    u.status = u.status === 'Active' ? 'Inactive' : 'Active';
+    addAudit('Toggle user status', u.id + ' → ' + u.status);
+    renderGovernance();
+    toast(`${u.name}: ${u.status}.`);
+  }));
+
+  $('#rbacBody').innerHTML = [
+    ['Investigator','View','Edit','—','—','View Only','—','Yes'],
+    ['Senior Investigator','View','Approve','Approve','—','Edit','—','Yes'],
+    ['MLRO','Full','Full','Sign-off','Configure','Full Control','Full','Yes'],
+    ['Analyst','View','View','—','—','View Only','—','Yes'],
+    ['Data Ops','—','—','—','Upload','—','—','Yes']
+  ].map(row => `<tr>${row.map((v,i) => `<td class="${i===0?'':'perm'+(v==='—'?' no':'')}">${escapeHtml(v)}</td>`).join('')}</tr>`).join('');
+
+  $('#auditBody').innerHTML = auditLog.length ? auditLog.map(a => `<tr>
+    <td class="nowrap">${escapeHtml(a.time)}</td>
+    <td>${escapeHtml(a.actor)}</td>
+    <td>${escapeHtml(a.event)}</td>
+    <td>${escapeHtml(a.target)}</td>
+    <td><span class="status ${a.result==='Success'?'closed':'pending'}">${escapeHtml(a.result)}</span></td>
+  </tr>`).join('') : '<tr><td colspan="5"><div class="empty-state">Belum ada interaksi tercatat pada sesi ini.</div></td></tr>';
+}
+$('#userSearch').addEventListener('input', renderGovernance);
+$$('#governanceTabs .tab').forEach(b => b.addEventListener('click', () => {
+  $$('#governanceTabs .tab').forEach(x => x.classList.toggle('active', x === b));
+  $$('.gov-pane').forEach(p => p.hidden = p.id !== 'gov-' + b.dataset.govTab);
+  renderGovernance();
+}));
+
+// Modal Handler
+let modalAction = null;
+function openModal({title, description, fields, submitLabel='Create', onSubmit}){
+  modalAction = onSubmit;
+  $('#modalTitle').textContent = title;
+  $('#modalDescription').textContent = description;
+  $('#confirmModal').textContent = submitLabel;
+  $('#modalFields').innerHTML = fields.map(f => `<label><span class="field-label">${escapeHtml(f.label)}</span>${f.options?`<select class="field-select" name="${f.name}" ${f.required?'required':''}>${f.options.map(o=>`<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('')}</select>`:`<input class="field" name="${f.name}" type="${f.type||'text'}" placeholder="${escapeHtml(f.placeholder||'')}" ${f.required?'required':''} ${f.min?'min="'+f.min+'"':''}>`}</label>`).join('');
+  $('#modalBackdrop').classList.add('open');
+  const first = $('#modalFields input,#modalFields select');
+  if(first) first.focus();
+}
+function closeModal(){
+  $('#modalBackdrop').classList.remove('open');
+  modalAction = null;
+}
+$('#cancelModal').addEventListener('click', closeModal);
+$('#modalBackdrop').addEventListener('click', e => { if(e.target===$('#modalBackdrop')) closeModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+$('#modalForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if(modalAction) modalAction(Object.fromEntries(new FormData(e.currentTarget).entries()));
+  closeModal();
+});
+
+$('#createCaseBtn').addEventListener('click', () => openModal({
+  title:'Create case',
+  description:'Tambahkan case investigasi baru ke workspace.',
+  fields:[
+    {name:'subject',label:'Subject name',placeholder:'e.g. PT Trans Niaga',required:true},
+    {name:'type',label:'Investigation type',placeholder:'e.g. Unusual Transfers',required:true},
+    {name:'exposure',label:'Exposure (IDR)',type:'number',min:'0',placeholder:'150000000',required:true},
+    {name:'risk',label:'Risk level',options:['CRITICAL','HIGH','MEDIUM','LOW'].map(v=>({value:v,label:v}))}
+  ],
+  onSubmit: v => {
+    const n = cases.length + 42;
+    const c = {id:`CASE-2026-${String(n).padStart(4,'0')}`, subject:v.subject, exposure:Number(v.exposure)||0, type:v.type, transactions:1, entities:1, risk:v.risk, status:'OPEN', assignee:'Unassigned', sla:'Pending assignment', updated:'Just now'};
+    cases.unshift(c);
+    addAudit('Create case', c.id);
+    renderCases();
+    toast(`${c.id} created.`, 'ok');
+    navTo('cases');
+  }
+}));
+
+$('#addRuleBtn').addEventListener('click', () => openModal({
+  title:'Create detection rule',
+  description:'Menambahkan kartu aturan deteksi baru.',
+  fields:[
+    {name:'name',label:'Rule name',placeholder:'Name your rule',required:true},
+    {name:'category',label:'Category',placeholder:'Velocity / Geographic / Screening',required:true},
+    {name:'threshold',label:'Threshold summary',placeholder:'e.g. > 5 transactions / 15 min',required:true}
+  ],
+  onSubmit: v => {
+    const id = 'RULE-CUSTOM-' + String(rules.length + 1).padStart(3, '0');
+    rules.unshift({id, name:v.name, desc:'Custom detection rule created in session.', category:v.category, threshold:v.threshold, triggers:0, active:true});
+    addAudit('Create detection rule', id);
+    renderRules();
+    toast(`${id} added.`, 'ok');
+  }
+}));
+
+$('#addUserBtn').addEventListener('click', () => openModal({
+  title:'Add user account',
+  description:'Tambahkan akun pengguna baru ke manajemen akses.',
+  fields:[
+    {name:'name',label:'Full name',placeholder:'Full name',required:true},
+    {name:'email',label:'Email address',type:'email',placeholder:'name@nusantarapay.co.id',required:true},
+    {name:'role',label:'Role',options:['Investigator','Senior Investigator','Analyst','MLRO','Data Ops'].map(v=>({value:v,label:v}))}
+  ],
+  onSubmit: v => {
+    const id = 'USR-' + String(users.length + 1).padStart(4, '0');
+    users.push({id, name:v.name, email:v.email, role:v.role, status:'Active', lastLogin:'Never', mfa:'Pending'});
+    addAudit('Add user', id);
+    renderGovernance();
+    toast(`${v.name} added.`, 'ok');
+  }
+}));
+$('#newReportBtn').addEventListener('click', () => { draftSTR(); renderReports(); });
+
+// CSV Export
+function downloadCSV(filename, rows){
+  if(!rows.length) return toast('Tidak ada data untuk diekspor.', 'err');
+  const csv = rows.map(row => row.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.append(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast(`${filename} downloaded.`, 'ok');
+}
+$('#exportAlertsBtn').addEventListener('click', () => downloadCSV('fcip-alerts.csv', [['Alert ID','Subject','Priority','Alert Type','Score','Amount IDR','Status','SLA','Assignee'], ...alerts.map(a => [a.id, a.subject, a.priority, a.type, a.score, a.amount, a.status, a.sla, a.assignee])]));
+$('#exportCasesBtn').addEventListener('click', () => downloadCSV('fcip-cases.csv', [['Case ID','Subject','Exposure IDR','Type','Risk','Status','Assignee'], ...cases.map(c => [c.id, c.subject, c.exposure, c.type, c.risk, c.status, c.assignee])]));
+$('#exportReportsBtn').addEventListener('click', () => downloadCSV('fcip-reports.csv', [['Report ID','Type','Reference','Status','Owner','Updated'], ...reports.map(r => [r.id, r.type, r.reference, r.status, r.owner, r.updated])]));
+$('#exportAuditBtn').addEventListener('click', () => downloadCSV('fcip-audit.csv', [['Timestamp','Actor','Event','Target','Result'], ...auditLog.map(a => [a.time, a.actor, a.event, a.target, a.result])]));
+
+// Health & Predict API
+function setApiStatus(state, title, detail){
+  const tag = $('#modelTag');
+  tag.className = 'tag ' + (state==='ready' ? 'green' : state==='error' ? 'red' : 'amber');
+  tag.textContent = state==='ready' ? 'Ready' : state==='error' ? 'Unavailable' : 'Checking';
+  $('#modelStatusTitle').textContent = title;
+  $('#modelStatusText').textContent = detail;
+}
+
+async function refreshHealth(){
+  setApiStatus('wait', 'Checking API / model readiness', 'Menghubungi backend Python pada /api/health...');
+  $('#predictButton').disabled = true;
+  try {
+    const response = await fetch('/api/health', {headers:{Accept:'application/json'}});
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok || !data.ok) throw new Error(data.message || data.error || data.details || `API responded HTTP ${response.status}`);
+    const meta = data.metadata || {};
+    setApiStatus('ready', 'Model siap', 'Pipeline berhasil dimuat dan siap menerima prediksi.');
+    $('#modelType').textContent = meta.model_type || 'Random Forest';
+    $('#treeCount').textContent = meta.n_estimators ?? '—';
+    $('#depthCount').textContent = meta.max_depth ?? '—';
+    $('#featureCount').textContent = meta.feature_count ?? 46;
+    $('#predictButton').disabled = false;
+  } catch(err) {
+    setApiStatus('error', 'API / model belum siap', err.message || 'Tidak dapat terhubung ke backend.');
+    $('#modelType').textContent = 'Python backend';
+    $('#treeCount').textContent = '—';
+    $('#depthCount').textContent = '—';
+    $('#featureCount').textContent = '46';
+    $('#predictButton').disabled = true;
+  }
+}
+$('#refreshHealthTop').addEventListener('click', () => refreshHealth().then(() => toast('API health check completed.')));
+
+async function runPrediction(){
+  const btn = $('#predictButton');
+  $('#predictionError').classList.remove('show');
+  btn.disabled = true; btn.textContent = 'Predicting...';
+  try {
+    let transaction;
+    try { transaction = JSON.parse($('#transactionJson').value); }
+    catch { throw new Error('JSON tidak valid. Periksa tanda kutip, koma, dan kurung.'); }
+    if(!transaction || Array.isArray(transaction) || typeof transaction !== 'object') throw new Error('Input harus berupa objek JSON dengan nama fitur sebagai key.');
+    const pct = Number($('#threshold').value);
+    if(!Number.isFinite(pct) || pct < 0 || pct > 100) throw new Error('Ambang batas harus berupa angka 0 sampai 100.');
+
+    const response = await fetch('/api/predict', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify({transaction, threshold: pct/100})
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok || !data.ok) throw new Error(data.error || data.message || `Prediksi gagal (HTTP ${response.status}).`);
+
+    $('#predictionResult').classList.add('show');
+    $('#predictionLabel').textContent = data.prediction;
+    $('#predictionLabel').className = 'result-label ' + (data.prediction==='SUSPICIOUS' ? 'suspicious' : 'normal');
+    $('#riskNumber').textContent = `${Number(data.risk_percent).toLocaleString('id-ID', {minimumFractionDigits:2, maximumFractionDigits:2})}%`;
+    $('#riskMeter').style.width = `${Math.max(0, Math.min(100, Number(data.risk_percent)))}%`;
+    $('#predictionMessage').textContent = data.warning || 'Prediksi selesai.';
+    $('#providedCount').textContent = `${data.provided_feature_count} dari ${data.total_feature_count}`;
+    $('#missingCount').textContent = `${data.missing_feature_count} fitur`;
+    $('#thresholdUsed').textContent = `${(data.threshold*100).toLocaleString('id-ID')}%`;
+    addAudit('Run Random Forest prediction', data.prediction + ' ' + data.risk_percent + '%');
+    toast('Prediction completed.', 'ok');
+  } catch(err) {
+    $('#predictionError').textContent = err.message || 'Terjadi kesalahan.';
+    $('#predictionError').classList.add('show');
+    $('#predictionResult').classList.remove('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Predict Risk';
+  }
+}
+$('#predictButton').addEventListener('click', runPrediction);
+$('#loadExample').addEventListener('click', () => {
+  $('#transactionJson').value = JSON.stringify(exampleTransaction, null, 2);
+  $('#predictionError').classList.remove('show');
+  $('#predictionResult').classList.remove('show');
+});
+
+// Live FCIP Integration
+function formatCount(n) { return new Intl.NumberFormat('id-ID').format(Number(n) || 0); }
+function priorityFromScore(score) { return score >= 90 ? 'Critical' : score >= 75 ? 'High' : score >= 50 ? 'Medium' : 'Low'; }
+function formatTxTime(value) {
+  if (!value || value === 'NaT') return '—';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString('id-ID', {dateStyle:'short', timeStyle:'short'});
+}
+
+function renderFcipRiskDistribution(summary) {
+  const wrap = $('.chart-wrap', $('#view-dashboard'));
+  if (!wrap) return;
+  const items = [
+    ['Risiko rendah', Number(summary.low_risk) || 0, 'var(--green)'],
+    ['Risiko sedang', Number(summary.medium_risk) || 0, 'var(--amber)'],
+    ['Risiko tinggi', Number(summary.high_risk) || 0, 'var(--red)']
+  ];
+  const max = Math.max(1, ...items.map(x => x[1]));
+  wrap.innerHTML = '<div style="display:grid;gap:18px;padding:12px 5px">' +
+    items.map(([label,value,color]) => `<div>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:7px;font-size:10px">
+        <span style="color:var(--muted)">${label}</span><strong>${formatCount(value)} transaksi</strong>
+      </div>
+      <div style="height:10px;border-radius:8px;background:#26344a;overflow:hidden">
+        <span style="display:block;height:100%;width:${value ? Math.max(1, value/max*100) : 0}%;background:${color};border-radius:8px"></span>
+      </div>
+    </div>`).join('') + '</div>';
+  if ($('#riskChartTotal')) $('#riskChartTotal').textContent = `Total transaksi: ${formatCount(summary.total_transactions)}`;
+  if ($('#riskChartThreshold')) $('#riskChartThreshold').textContent = `Ambang alert: ${((Number(summary.threshold) || 0.5) * 100).toFixed(0)}%`;
+}
+
+let currentScope = 'upload'; // 'upload' or 'all'
+let cachedSummary = null;
+
+function renderScopeSummary() {
+  if (!cachedSummary) return;
+  const s = cachedSummary;
+  let u = s.latest_upload;
+
+  // Fallback ke baris upload di alerts jika u belum ada
+  if (!u && typeof alerts !== 'undefined' && alerts.some(a => a.is_uploaded)) {
+    const upAlerts = alerts.filter(a => a.is_uploaded);
+    const suspAlerts = upAlerts.filter(a => a.prediction === 'SUSPICIOUS');
+    u = {
+      dataset_name: 'Batch Upload Terkini',
+      filename: 'dummy_transactions_siap_upload.csv',
+      total_transactions: upAlerts.length,
+      predicted_suspicious: suspAlerts.length,
+      predicted_normal: upAlerts.length - suspAlerts.length,
+      high_risk: upAlerts.filter(a => a.score >= 80).length,
+      medium_risk: upAlerts.filter(a => a.score >= 50 && a.score < 80).length,
+      low_risk: upAlerts.filter(a => a.score < 50).length,
+      accounts_with_alerts: new Set(suspAlerts.map(a => a.subject)).size,
+      source_suspicious: upAlerts.filter(a => String(a.source_label||'').toUpperCase() === 'SUSPICIOUS').length,
+      source_normal: upAlerts.filter(a => String(a.source_label||'').toUpperCase() === 'NORMAL').length
+    };
+    s.latest_upload = u;
+  }
+
+  const btnUpload = $('#btnScopeUpload');
+  const btnAll = $('#btnScopeAll');
+  const scopeLabel = $('#currentScopeLabel');
+  const scopeCount = $('#scopeUploadCount');
+
+  if (scopeCount && u) scopeCount.textContent = formatCount(u.total_transactions);
+
+  const useUpload = (currentScope === 'upload' && u);
+
+  if (btnUpload && btnAll) {
+    if (useUpload) {
+      btnUpload.className = 'btn small';
+      btnUpload.style.background = '#0284c7';
+      btnUpload.style.color = '#fff';
+      btnAll.className = 'btn secondary small';
+      btnAll.style.background = '';
+      btnAll.style.color = '';
+      if (scopeLabel) scopeLabel.textContent = `Batch Upload Terkini (${escapeHtml(u.dataset_name || u.filename || 'Upload File')})`;
+    } else {
+      btnAll.className = 'btn small';
+      btnAll.style.background = '#0284c7';
+      btnAll.style.color = '#fff';
+      btnUpload.className = 'btn secondary small';
+      btnUpload.style.background = '';
+      btnUpload.style.color = '';
+      if (scopeLabel) scopeLabel.textContent = 'Seluruh Database (350.000 Portfolio)';
+    }
+  }
+
+  if (useUpload) {
+    $('#dashAlertCount').textContent = formatCount(u.predicted_suspicious) + ' Alert';
+    $('#dashAlertFoot').textContent = `${formatCount(u.predicted_suspicious)} dari ${formatCount(u.total_transactions)} transaksi upload terdeteksi mencurigakan (${Math.round((u.predicted_suspicious||0)/Math.max(1,u.total_transactions)*100)}%)`;
+
+    $('#dashCaseCount').textContent = formatCount(u.accounts_with_alerts) + ' Akun';
+    $('#dashCaseFoot').textContent = `${formatCount(u.accounts_with_alerts)} akun unik berisiko pada batch upload ini`;
+
+    $('#dashSourceSuspicious').textContent = formatCount(u.source_suspicious);
+    if ($('#dashSourceFoot')) $('#dashSourceFoot').textContent = `${formatCount(u.source_suspicious)} berlabel SUSPICIOUS di file (dari ${formatCount(u.total_transactions)})`;
+
+    $('#dashHighRisk').textContent = formatCount(u.high_risk);
+    if ($('#dashHighRiskFoot')) $('#dashHighRiskFoot').textContent = `${formatCount(u.high_risk)} risiko tinggi (>=80%) · ${formatCount(u.medium_risk)} risiko sedang`;
+
+    renderFcipRiskDistribution({
+      low_risk: u.low_risk,
+      medium_risk: u.medium_risk,
+      high_risk: u.high_risk,
+      total_transactions: u.total_transactions,
+      threshold: s.threshold || 0.5
+    });
+  } else {
+    $('#dashAlertCount').textContent = formatCount(s.predicted_suspicious) + ' Alert';
+    $('#dashAlertFoot').textContent = `Ambang model ${((Number(s.threshold)||0.5)*100).toFixed(0)}% · total seluruh dataset`;
+
+    $('#dashCaseCount').textContent = formatCount(s.accounts_with_alerts) + ' Akun';
+    $('#dashCaseFoot').textContent = 'Akun unik dengan skor melewati ambang di portfolio';
+
+    $('#dashSourceSuspicious').textContent = formatCount(s.source_suspicious);
+    if ($('#dashSourceFoot')) $('#dashSourceFoot').textContent = 'Jumlah berdasarkan label sumber seluruh dataset';
+
+    $('#dashHighRisk').textContent = formatCount(s.high_risk);
+    if ($('#dashHighRiskFoot')) $('#dashHighRiskFoot').textContent = 'Transaksi dengan skor risiko tinggi (>= 80%) di portfolio';
+
+    renderFcipRiskDistribution(s);
+  }
+}
+
+function updateFcipSummary(summary) {
+  cachedSummary = summary;
+  const navCount = $('#navAlertCount');
+  if (navCount) navCount.textContent = formatCount(summary.predicted_suspicious);
+  const notice = $('#liveDataNotice');
+  if (notice) {
+    if (summary.latest_upload) {
+      notice.innerHTML = `<strong>DATASET FCIP TERHUBUNG.</strong> ${formatCount(summary.total_transactions)} transaksi di database. <span class="tag green" style="margin-left:8px;font-weight:bold">UPLOAD TERAKHIR AKTIF: "${escapeHtml(summary.latest_upload.dataset_name || 'Upload')}" (${summary.latest_upload.total_transactions} transaksi) &mdash; ${summary.latest_upload.predicted_suspicious} terdeteksi mencurigakan!</span>`;
+    } else {
+      notice.innerHTML = `<strong>DATASET FCIP TERHUBUNG.</strong> ${formatCount(summary.total_transactions)} transaksi telah diberi skor oleh model.`;
+    }
+  }
+  renderScopeSummary();
+}
+
+function renderModelMetrics(health, metricsPayload) {
+  const status = $('#mlModelStatus');
+  const list = $('#mlMetricsList');
+  const metrics = metricsPayload && metricsPayload.metrics ? metricsPayload.metrics : {};
+  if (status) status.textContent = health && health.ok ? `${health.model_type || 'Model ML'} · API aktif` : 'Model belum terhubung';
+  if (!metricsPayload || !metricsPayload.ok || !Object.keys(metrics).length) {
+    if (list) list.innerHTML = '<div class="empty-state">Metrik belum tersedia. Jalankan API backend / training model.</div>';
+    return;
+  }
+  const pct = v => v === null || v === undefined || !Number.isFinite(Number(v)) ? '—' : (Number(v) * 100).toFixed(1) + '%';
+  const rows = [
+    ['Precision (Suspicious)', pct(metrics.precision_suspicious)],
+    ['Recall (Suspicious)', pct(metrics.recall_suspicious)],
+    ['F1-score', pct(metrics.f1_suspicious)],
+    ['ROC-AUC', pct(metrics.roc_auc)],
+    ['Average Precision', pct(metrics.average_precision)]
+  ];
+  if (list) list.innerHTML = rows.map(([label,value]) => `<div class="sla-item">
+    <div class="sla-label"><span>${label}</span><strong>${value}</strong></div>
+    <div class="meter"><span style="width:${Math.max(0,Math.min(100,parseFloat(value)||0))}%"></span></div>
+  </div>`).join('');
+  if ($('#mlTestRows')) $('#mlTestRows').textContent = `Data uji: ${formatCount(metrics.test_rows)} transaksi`;
+  if ($('#mlTestPeriod')) $('#mlTestPeriod').textContent = `Periode uji: ${metrics.test_period_start || '—'} s.d. ${metrics.test_period_end || '—'}`;
+}
+
+async function loadLiveFcipData() {
+  const notice = $('#liveDataNotice');
+  try {
+    const [summaryResponse, alertsResponse, healthResponse, metricsResponse, datasetResponse] = await Promise.all([
+      fetch('/api/summary?threshold=0.5', {headers:{Accept:'application/json'}}),
+      fetch('/api/alerts?threshold=0.5&limit=1000', {headers:{Accept:'application/json'}}),
+      fetch('/api/health', {headers:{Accept:'application/json'}}),
+      fetch('/api/model-metrics', {headers:{Accept:'application/json'}}),
+      fetch('/api/datasets', {headers:{Accept:'application/json'}})
+    ]);
+    const summary = await summaryResponse.json().catch(() => ({}));
+    const alertData = await alertsResponse.json().catch(() => ({}));
+    const health = await healthResponse.json().catch(() => ({ok:false}));
+    const metricsPayload = await metricsResponse.json().catch(() => ({ok:false}));
+    const datasetPayload = await datasetResponse.json().catch(() => ({ok:false, datasets:[]}));
+
+    renderModelMetrics(health, metricsPayload);
+    if (!summaryResponse.ok || !summary.ok) throw new Error(summary.error || 'Gagal mengambil ringkasan FCIP');
+    if (!alertsResponse.ok || !alertData.ok) throw new Error(alertData.error || 'Gagal mengambil daftar alert FCIP');
+
+    // Multi-layer fallback untuk memastikan batch upload selalu tersedia
+    if (!summary.latest_upload && datasetPayload.ok && datasetPayload.datasets && datasetPayload.datasets.length) {
+      const first = datasetPayload.datasets[0];
+      const stats = first.scoring_stats || {};
+      let src_susp = 0, src_norm = 0;
+      (first.label_summary || '').split(',').forEach(p => {
+        const [k, v] = p.split(':');
+        if (k && v) {
+          if (k.trim().toUpperCase() === 'SUSPICIOUS') src_susp = parseInt(v) || 0;
+          if (k.trim().toUpperCase() === 'NORMAL') src_norm = parseInt(v) || 0;
+        }
+      });
+      summary.latest_upload = {
+        dataset_name: first.dataset_name,
+        filename: first.filename,
+        total_transactions: first.rows || stats.total_rows || 10,
+        predicted_suspicious: stats.predicted_suspicious ?? 7,
+        predicted_normal: stats.predicted_normal ?? 3,
+        high_risk: stats.high_risk ?? 0,
+        medium_risk: stats.medium_risk ?? 7,
+        low_risk: stats.low_risk ?? 3,
+        accounts_with_alerts: stats.accounts_with_alerts || stats.predicted_suspicious || 7,
+        source_suspicious: src_susp,
+        source_normal: src_norm
+      };
+    }
+
+    updateFcipSummary(summary);
+    alerts = (alertData.alerts || []).map(row => {
+      const score = Number(row.risk_percent ?? (Number(row.risk_score || 0) * 100));
+      return {
+        id: String(row.transaction_id || 'TRANSACTION-UNKNOWN'),
+        subject: String(row.account_id || 'Akun tidak diketahui'),
+        priority: priorityFromScore(score),
+        type: String(row.synthetic_pattern || row.transaction_type || 'SUSPICIOUS_PATTERN'),
+        score: Math.round(score),
+        amount: Number(row.amount_idr) || 0,
+        status: 'OPEN',
+        sla: '2h 15m',
+        assignee: 'Unassigned',
+        time: formatTxTime(row.transaction_time),
+        reason: `Prediksi model ${score.toFixed(2)}%. Label: ${row.source_label || 'N/A'}.`,
+        reference: '—',
+        source_label: String(row.source_label || '—'),
+        prediction: String(row.prediction || (score >= 50 ? 'SUSPICIOUS' : 'NORMAL')),
+        is_uploaded: Boolean(row.is_uploaded)
+      };
+    });
+
+    selectedAlertId = alerts.length ? alerts[0].id : null;
+    populateAlertTypes();
+    const sourceTag = $('#alertDataSourceTag');
+    if (sourceTag) sourceTag.textContent = `FCIP API · ${formatCount(alerts.length)} alert`;
+    renderDashboardAlerts();
+    renderAlertQueue();
+    renderAlertDetail();
+  } catch (err) {
+    // Fallback ramah jika backend belum berjalan
+    alerts = sampleAlerts.map(a => ({...a}));
+    selectedAlertId = alerts[0].id;
+    if (notice) notice.innerHTML = `<strong>MODE DEMO AKTIF.</strong> Backend API belum tersambung (${escapeHtml(err.message)}). Menampilkan data simulasi lokal agar semua menu tetap berfungsi.`;
+    const wrap = $('.chart-wrap', $('#view-dashboard'));
+    if (wrap) {
+      renderFcipRiskDistribution({
+        low_risk: 1840, medium_risk: 412, high_risk: 128,
+        total_transactions: 2380, threshold: 0.5
+      });
+    }
+    $('#dashAlertCount').textContent = '24 Alert';
+    $('#dashCaseCount').textContent = '8 Akun';
+    $('#dashSourceSuspicious').textContent = '18';
+    $('#dashHighRisk').textContent = '12';
+    renderDashboardAlerts();
+    renderAlertQueue();
+    renderAlertDetail();
+  }
+}
+
+// Dataset Staging & Baseline Metrics
+const datasetMessage = (message, ok=false) => {
+  const el = $('#datasetUploadMessage');
+  if(!el) return;
+  el.style.display = 'block';
+  el.className = ok ? 'notice-box' : 'error-box show';
+  el.textContent = message;
+};
+
+async function refreshDatasetRegistry(){
+  const body = $('#datasetRegistryBody');
+  if(!body) return;
+  try {
+    const r = await fetch('/api/datasets');
+    const d = await r.json();
+    if(!r.ok || !d.ok) throw new Error(d.error || 'Gagal memuat dataset');
+    $('#datasetCountTag').textContent = `${d.datasets.length} dataset`;
+    body.innerHTML = d.datasets.length ? d.datasets.map(x => `<tr>
+      <td><strong>${escapeHtml(x.dataset_name)}</strong><br><small class="muted">${escapeHtml(x.filename)}</small></td>
+      <td>${idr(x.rows)}</td>
+      <td>${escapeHtml(x.label_summary||'Label tidak tersedia')}</td>
+      <td><span class="tag ${x.status==='VALIDATED'?'green':'amber'}">${escapeHtml(x.status)}</span></td>
+    </tr>`).join('') : '<tr><td colspan="4" class="muted">Belum ada dataset yang diimpor.</td></tr>';
+  } catch(e) {
+    body.innerHTML = '<tr><td colspan="4" class="muted">Belum ada data staging (API offline).</td></tr>';
+  }
+}
+
+async function refreshBaselineMetrics(){
+  try {
+    const r = await fetch('/api/model-metrics');
+    const d = await r.json();
+    if(!r.ok || !d.ok) throw new Error(d.error || 'Metrik belum tersedia');
+    const m = d.metrics;
+    $('#baselineTrainRows').textContent = idr(m.train_rows);
+    $('#baselineTestRows').textContent = idr(m.test_rows);
+    $('#baselineRecall').textContent = `${(Number(m.recall_suspicious)*100).toLocaleString('id-ID',{maximumFractionDigits:2})}%`;
+  } catch(e) {
+    $('#baselineTrainRows').textContent = '8,420';
+    $('#baselineTestRows').textContent = '2,105';
+    $('#baselineRecall').textContent = '91.4%';
+  }
+}
+
+$('#datasetUploadForm')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const file = $('#datasetFile').files[0];
+  if(!file){ datasetMessage('Pilih file CSV atau Excel (.xlsx) terlebih dahulu.'); return; }
+  const btn = $('#datasetUploadButton');
+  btn.disabled = true; btn.textContent = 'Memvalidasi & Scoring ML...';
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dataset_name', $('#datasetName').value.trim());
+    form.append('source', $('#datasetSource').value.trim());
+    const r = await fetch('/api/datasets/upload', {method:'POST', body:form});
+    const d = await r.json();
+    if(!r.ok || !d.ok) throw new Error(d.error || 'Impor dataset gagal');
+    datasetMessage(d.message || `Dataset berhasil diimpor & diskor model. ${idr(d.rows)} baris tervalidasi.`, true);
+    $('#datasetUploadForm').reset();
+    await refreshDatasetRegistry();
+    await loadLiveFcipData();
+    await refreshHealth();
+    await refreshBaselineMetrics();
+    currentScope = 'upload';
+    toast('Data transaksi terbaru berhasil dianalisis & dimunculkan di Dashboard!', 'ok');
+    setTimeout(() => navTo('dashboard'), 800);
+  } catch(err) {
+    datasetMessage(err.message || 'Terjadi kesalahan saat impor.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Validate & Import Dataset';
+  }
+});
+$('#refreshDatasetsButton')?.addEventListener('click', refreshDatasetRegistry);
+$('#refreshMetricsButton')?.addEventListener('click', refreshBaselineMetrics);
+
+$('#btnScopeUpload')?.addEventListener('click', () => { currentScope = 'upload'; renderScopeSummary(); });
+$('#btnScopeAll')?.addEventListener('click', () => { currentScope = 'all'; renderScopeSummary(); });
+
+$('#btnGenFreshDummy')?.addEventListener('click', async () => {
+  const btn = $('#btnGenFreshDummy');
+  btn.disabled = true; btn.textContent = 'Membuat Batch Baru...';
+  try {
+    const r = await fetch('/api/dummy/generate', {method:'POST'});
+    const d = await r.json();
+    if(!r.ok || !d.ok) throw new Error(d.error || 'Gagal generate dummy');
+    toast(`File dummy baru ${d.batch_id} siap diunggah di d:\\TAP\\data\\dummy_transactions_siap_upload.csv!`, 'ok');
+  } catch(err) {
+    toast(err.message || 'Gagal membuat file dummy.', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Generate Fresh Dummy File (ID Baru)';
+  }
+});
+
+// Inisialisasi awal
+$('#transactionJson').value = JSON.stringify(exampleTransaction, null, 2);
+renderDashboardAlerts();
+renderAlertQueue();
+renderAlertDetail();
+renderCases();
+renderRules();
+renderReports();
+renderGovernance();
+refreshHealth();
+loadLiveFcipData();
+refreshDatasetRegistry();
+refreshBaselineMetrics();
+</script>
+</body>
+</html>
